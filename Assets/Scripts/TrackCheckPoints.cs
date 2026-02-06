@@ -23,6 +23,12 @@ public class TrackCheckPoints : MonoBehaviour
             }
         }
     }
+
+    private void Start()
+    {
+        // Show the first two checkpoints at the start
+        UpdateVisibleCheckpoints();
+    }
     
     public void PlayerThroughCheckPoint(CheckpointSingle checkpointSingle)
     {
@@ -31,21 +37,37 @@ public class TrackCheckPoints : MonoBehaviour
         if (checkpointIndex == nextCheckpointIndex)
         {
             Debug.Log($"CORRECT checkpoint {checkpointSingle.name}");
-            CheckpointSingle correctCheckpointSingle = checkpointSingleList[nextCheckpointIndex];
-            correctCheckpointSingle.Hide();
+            
             nextCheckpointIndex = (nextCheckpointIndex + 1) % checkpointSingleList.Count;
+            
+            // Update which checkpoints are visible
+            UpdateVisibleCheckpoints();
+
             OnPlayerCorrectCheckpoint?.Invoke(this, EventArgs.Empty);
         }
         else
         {
             Debug.Log($"WRONG checkpoint! Expected {nextCheckpointIndex}, got {checkpointIndex}");
             OnPlayerWrongCheckpoint?.Invoke(this, EventArgs.Empty);
-            CheckpointSingle correctCheckpointSingle = checkpointSingleList[nextCheckpointIndex];
-            correctCheckpointSingle.Show();
         }
     }
+
+    private void UpdateVisibleCheckpoints()
+    {
+        // Hide all checkpoints first
+        foreach (var checkpoint in checkpointSingleList)
+        {
+            checkpoint.Hide();
+        }
+
+        // Show next checkpoint
+        checkpointSingleList[nextCheckpointIndex].Show();
+
+        // Show checkpoint after next (wrapping around if needed)
+        int nextPlusOneIndex = (nextCheckpointIndex + 1) % checkpointSingleList.Count;
+        checkpointSingleList[nextPlusOneIndex].Show();
+    }
     
-    // Add these public methods
     public int GetNextCheckpointIndex()
     {
         return nextCheckpointIndex;
