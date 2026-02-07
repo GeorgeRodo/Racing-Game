@@ -6,9 +6,16 @@ public class TrackCheckPoints : MonoBehaviour
 {
     public event EventHandler OnPlayerCorrectCheckpoint;
     public event EventHandler OnPlayerWrongCheckpoint;
+    public event EventHandler OnLapCompleted;
+    public event EventHandler OnRaceFinished;
+    
+    [Header("Race Settings")]
+    public int totalLaps = 3;
     
     private List<CheckpointSingle> checkpointSingleList = new List<CheckpointSingle>();
     private int nextCheckpointIndex = 0;
+    private int currentLap = 1;
+    private bool raceFinished = false;
     
     private void Awake()
     {
@@ -32,13 +39,22 @@ public class TrackCheckPoints : MonoBehaviour
     
     public void PlayerThroughCheckPoint(CheckpointSingle checkpointSingle)
     {
+        if (raceFinished) return;
+        
         int checkpointIndex = checkpointSingleList.IndexOf(checkpointSingle);
         
         if (checkpointIndex == nextCheckpointIndex)
         {
             Debug.Log($"CORRECT checkpoint {checkpointSingle.name}");
             
-            nextCheckpointIndex = (nextCheckpointIndex + 1) % checkpointSingleList.Count;
+            nextCheckpointIndex++;
+            
+            // Check if we completed a lap (passed all checkpoints)
+            if (nextCheckpointIndex >= checkpointSingleList.Count)
+            {
+                nextCheckpointIndex = 0;
+                CompleteLap();
+            }
             
             // Update which checkpoints are visible
             UpdateVisibleCheckpoints();
@@ -50,6 +66,29 @@ public class TrackCheckPoints : MonoBehaviour
             Debug.Log($"WRONG checkpoint! Expected {nextCheckpointIndex}, got {checkpointIndex}");
             OnPlayerWrongCheckpoint?.Invoke(this, EventArgs.Empty);
         }
+    }
+
+    private void CompleteLap()
+    {
+        Debug.Log($"Lap {currentLap} completed!");
+        
+        OnLapCompleted?.Invoke(this, EventArgs.Empty);
+        
+        currentLap++;
+        
+        // Check if race is complete
+        if (currentLap > totalLaps)
+        {
+            FinishRace();
+        }
+    }
+
+    private void FinishRace()
+    {
+        raceFinished = true;
+        Debug.Log("RACE FINISHED!");
+        
+        OnRaceFinished?.Invoke(this, EventArgs.Empty);
     }
 
     private void UpdateVisibleCheckpoints()
@@ -68,13 +107,10 @@ public class TrackCheckPoints : MonoBehaviour
         checkpointSingleList[nextPlusOneIndex].Show();
     }
     
-    public int GetNextCheckpointIndex()
-    {
-        return nextCheckpointIndex;
-    }
-    
-    public int GetTotalCheckpoints()
-    {
-        return checkpointSingleList.Count;
-    }
+    // Public getters
+    public int GetNextCheckpointIndex() { return nextCheckpointIndex; }
+    public int GetTotalCheckpoints() { return checkpointSingleList.Count; }
+    public int GetCurrentLap() { return currentLap; }
+    public int GetTotalLaps() { return totalLaps; }
+    public bool IsRaceFinished() { return raceFinished; }
 }

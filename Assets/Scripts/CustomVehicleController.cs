@@ -45,6 +45,11 @@ public class CustomVehicleController : MonoBehaviour
     public float driftGripReduction = 0.3f;  // Reduces grip to 30% during drift
     public float minSpeedToDrift = 5f;
     public float driftSteerBoost = 1.5f;
+    public float driftTorque = 8000f; // Torque applied when initiating drift
+    public float driftAngularDamping = 3f; // Controls rotation during drift (lower = more spin)
+    public float normalAngularDamping = 5f; // Normal angular damping when not drifting
+    public float driftExitSnapiness = 0.3f; // How quickly car straightens when exiting drift (0-1)
+    public float counterSteerAssist = 0.4f; // Helps prevent spin-outs (0-1)
     
     [Header("Visual Settings")]
     public float wheelSmoothSpeed = 15f; // Higher = snappier, Lower = more realistic
@@ -61,6 +66,8 @@ public class CustomVehicleController : MonoBehaviour
     private float steerInput;
     private float currentSteerAngle;
     private bool isDrifting;
+    private bool wasDrifting;
+    private float driftDirection; // -1 for left, 1 for right
     private Transform[] allWheels;
     private Vector3[] wheelTargetPositions = new Vector3[4];
     
@@ -77,6 +84,9 @@ public class CustomVehicleController : MonoBehaviour
         {
             rb.centerOfMass = new Vector3(0, -0.5f, 0);
         }
+        
+        // Set initial angular damping
+        rb.angularDamping = normalAngularDamping;
         
         // Store all wheel transforms for easy iteration
         allWheels = new Transform[] 
@@ -100,6 +110,8 @@ public class CustomVehicleController : MonoBehaviour
     
     void Update()
     {
+        if (!enabled) return;
+        
         // Get input
         motorInput = Input.GetAxis("Vertical");
         steerInput = Input.GetAxis("Horizontal");
@@ -108,13 +120,31 @@ public class CustomVehicleController : MonoBehaviour
         float currentSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
         bool driftPressed = Input.GetKey(driftKey);
         
+        wasDrifting = isDrifting;
+        
+        // Check if we can/should be drifting
         if (driftPressed && Mathf.Abs(currentSpeed) >= minSpeedToDrift && Mathf.Abs(steerInput) > 0.1f)
         {
+            if (!isDrifting)
+            {
+                // Just started drifting - record direction
+                driftDirection = Mathf.Sign(steerInput);
+            }
             isDrifting = true;
         }
         else if (!driftPressed)
         {
             isDrifting = false;
+        }
+        
+        // Update angular damping based on drift state
+        if (isDrifting)
+        {
+            rb.angularDamping = driftAngularDamping;
+        }
+        else
+        {
+            rb.angularDamping = normalAngularDamping;
         }
         
         // Update steering angle smoothly with speed-based reduction
@@ -126,6 +156,9 @@ public class CustomVehicleController : MonoBehaviour
     
     void FixedUpdate()
     {
+        // Apply drift physics
+        ApplyDriftPhysics();
+        
         // Apply physics forces at each wheel
         foreach (Transform wheel in allWheels)
         {
@@ -140,6 +173,45 @@ public class CustomVehicleController : MonoBehaviour
         
         // Update visual wheel meshes
         UpdateWheelVisuals();
+    }
+    
+    void ApplyDriftPhysics()
+    {
+        float currentSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
+        
+        // Only apply drift physics if we're actually drifting
+        if (isDrifting && Mathf.Abs(currentSpeed) >= minSpeedToDrift)
+        {
+            // Apply torque to rotate the car in drift direction
+            float torqueAmount = steerInput * driftTorque;
+            rb.AddTorque(transform.up * torqueAmount);
+            
+            // Counter-steer assist: if player is steering opposite to drift, help straighten out
+            if (Mathf.Sign(steerInput) != Mathf.Sign(driftDirection) && Mathf.Abs(steerInput) > 0.3f)
+            {
+                // Apply counter-torque to prevent spin-out
+                Vector3 angularVel = rb.angularVelocity;
+                float yawVelocity = Vector3.Dot(angularVel, transform.up);
+                rb.AddTorque(-transform.up * yawVelocity * counterSteerAssist * 1000f);
+            }
+        }
+        // Exiting drift - help straighten the car
+        else if (wasDrifting && !isDrifting)
+        {
+            // Snap velocity more towards forward direction
+            Vector3 forwardVel = transform.forward * Vector3.Dot(rb.linearVelocity, transform.forward);
+            Vector3 sidewaysVel = transform.right * Vector3.Dot(rb.linearVelocity, transform.right);
+            
+            // Reduce sideways velocity to help straighten out
+            rb.linearVelocity = Vector3.Lerp(
+                rb.linearVelocity,
+                forwardVel + sidewaysVel * (1f - driftExitSnapiness),
+                0.3f
+            );
+            
+            // Also dampen angular velocity
+            rb.angularVelocity *= 0.7f;
+        }
     }
     
     void ApplyWheelForces(Transform wheel)
@@ -217,6 +289,12 @@ public class CustomVehicleController : MonoBehaviour
         // Apply grip reduction during drift
         float gripMultiplier = isDrifting ? driftGripReduction : 1f;
         
+        // REAR WHEELS GET EXTRA GRIP REDUCTION during drift for better sliding
+        if (isDrifting && !IsFrontWheel(wheel))
+        {
+            gripMultiplier *= 0.7f; // Even less grip on rear wheels
+        }
+        
         // Calculate desired velocity change (we want to eliminate slip)
         float desiredVelocityChange = -steeringVelocity * sidewaysGripFactor * gripMultiplier;
         
@@ -246,6 +324,12 @@ public class CustomVehicleController : MonoBehaviour
             // Scale power by speed curve
             float powerMultiplier = powerCurveBySpeed.Evaluate(Mathf.Abs(forwardSpeed));
             availablePower = motorInput * motorPower * powerMultiplier;
+            
+            // Boost power slightly during drift for maintaining speed
+            if (isDrifting)
+            {
+                availablePower *= 1.2f;
+            }
         }
         // Reverse drive
         else if (motorInput < 0)
@@ -265,8 +349,9 @@ public class CustomVehicleController : MonoBehaviour
         // Braking (no input)
         else
         {
-            // Apply light rolling resistance
-            availablePower = -Mathf.Sign(forwardSpeed) * forwardGripFactor * 1000f;
+            // Apply light rolling resistance (less during drift)
+            float resistanceMultiplier = isDrifting ? 0.5f : 1f;
+            availablePower = -Mathf.Sign(forwardSpeed) * forwardGripFactor * 1000f * resistanceMultiplier;
         }
         
         return wheel.forward * availablePower;
@@ -379,6 +464,22 @@ public class CustomVehicleController : MonoBehaviour
         return isDrifting;
     }
     
+    // Public getter for drift angle (useful for UI/effects)
+    public float GetDriftAngle()
+    {
+        if (!isDrifting) return 0f;
+        
+        // Calculate angle between velocity and forward direction
+        Vector3 velocity = rb.linearVelocity;
+        if (velocity.magnitude < 0.1f) return 0f;
+        
+        Vector3 velocityDir = velocity.normalized;
+        Vector3 forwardDir = transform.forward;
+        
+        float angle = Vector3.SignedAngle(forwardDir, velocityDir, Vector3.up);
+        return angle;
+    }
+    
     void OnDrawGizmos()
     {
         if (!Application.isPlaying || allWheels == null) return;
@@ -392,6 +493,15 @@ public class CustomVehicleController : MonoBehaviour
                 Gizmos.DrawWireSphere(wheel.position, 0.1f);
                 Gizmos.DrawLine(wheel.position, wheel.position - wheel.up * (suspensionRestDistance + maxSuspensionTravel));
             }
+        }
+        
+        // Draw drift direction indicator when drifting
+        if (isDrifting)
+        {
+            Gizmos.color = Color.cyan;
+            Vector3 driftIndicator = transform.position + transform.up * 2f;
+            Gizmos.DrawWireSphere(driftIndicator, 0.3f);
+            Gizmos.DrawRay(driftIndicator, transform.right * driftDirection * 2f);
         }
     }
 }

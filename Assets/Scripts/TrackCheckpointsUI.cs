@@ -1,67 +1,35 @@
 using UnityEngine;
-using TMPro; // If you're using TextMeshPro
 
 public class TrackCheckpointsUI : MonoBehaviour
 {
     [SerializeField] private TrackCheckPoints trackCheckPoints;
-    [SerializeField] private GameObject wrongCheckpointWarning; // A UI panel/text that says "WRONG CHECKPOINT!"
-    [SerializeField] private float warningDisplayTime = 2f; // How long to show the warning
-    
-    private float warningTimer = 0f;
 
     private void Start()
     {
         trackCheckPoints.OnPlayerCorrectCheckpoint += TrackCheckPoints_OnPlayerCorrectCheckpoint;
         trackCheckPoints.OnPlayerWrongCheckpoint += TrackCheckPoints_OnPlayerWrongCheckpoint;
-        
-        // Hide warning initially
-        if (wrongCheckpointWarning != null)
-        {
-            wrongCheckpointWarning.SetActive(false);
-        }
-    }
-
-    private void Update()
-    {
-        // Auto-hide warning after timer expires
-        if (warningTimer > 0)
-        {
-            warningTimer -= Time.deltaTime;
-            if (warningTimer <= 0)
-            {
-                HideWarning();
-            }
-        }
+        Hide();
     }
 
     private void TrackCheckPoints_OnPlayerWrongCheckpoint(object sender, System.EventArgs e)
     {
-        Debug.Log("UI: Player hit wrong checkpoint!");
-        ShowWarning();
+        Debug.Log("Player hit wrong checkpoint!");
+        Show();
     }
 
     private void TrackCheckPoints_OnPlayerCorrectCheckpoint(object sender, System.EventArgs e)
     {
-        Debug.Log("UI: Player hit correct checkpoint!");
-        // Optionally hide warning immediately if they hit correct checkpoint
-        HideWarning();
+        Debug.Log("Player hit correct checkpoint!");
+        Hide();
     }
 
-    private void ShowWarning()
+    private void Show()
     {
-        if (wrongCheckpointWarning != null)
-        {
-            wrongCheckpointWarning.SetActive(true);
-            warningTimer = warningDisplayTime;
-        }
+        gameObject.SetActive(true);
     }
 
-    private void HideWarning()
+    private void Hide()
     {
-        if (wrongCheckpointWarning != null)
-        {
-            wrongCheckpointWarning.SetActive(false);
-        }
-        warningTimer = 0f;
+        gameObject.SetActive(false);
     }
 }
