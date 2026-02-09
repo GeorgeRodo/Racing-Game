@@ -7,26 +7,26 @@ public class CustomVehicleController : MonoBehaviour
     public Transform frontRightWheel;
     public Transform rearLeftWheel;
     public Transform rearRightWheel;
-    
+
     [Header("Wheel Meshes (Visual)")]
     public Transform frontLeftMesh;
     public Transform frontRightMesh;
     public Transform rearLeftMesh;
     public Transform rearRightMesh;
-    
+
     [Header("Suspension Settings")]
     public float suspensionRestDistance = 0.6f;
     public float springStrength = 35000f;
     public float springDamper = 4500f;
     public float maxSuspensionTravel = 0.3f;
     public float wheelRadius = 0.3f;
-    public float landingForceMultiplier = 2f; // Extra spring force when landing hard
-    
+    public float landingForceMultiplier = 2f;
+
     [Header("Steering Settings")]
     public float maxSteeringAngle = 25f;
     public float steerSpeed = 8f;
     public AnimationCurve steerCurveBySpeed = AnimationCurve.Linear(0, 1, 30, 0.4f);
-    
+
     [Header("Drive Settings")]
     public float motorPower = 18000f;
     public float reversePower = 10000f;
@@ -34,276 +34,261 @@ public class CustomVehicleController : MonoBehaviour
     public float maxSpeed = 30f;
     public float maxReverseSpeed = 10f;
     public AnimationCurve powerCurveBySpeed = AnimationCurve.EaseInOut(0, 1, 30, 0.3f);
-    
+
     [Header("Tire Grip Settings")]
     public float forwardGripFactor = 2.5f;
     public float sidewaysGripFactor = 3.5f;
     public float tireMass = 15f;
-    
-    [Header("Drifting")]
-    public KeyCode driftKey = KeyCode.Space;
-    public float driftGripReduction = 0.3f;  // Reduces grip to 30% during drift
-    public float minSpeedToDrift = 5f;
-    public float driftSteerBoost = 1.5f;
-    public float driftTorque = 8000f; // Torque applied when initiating drift
-    public float driftAngularDamping = 3f; // Controls rotation during drift (lower = more spin)
-    public float normalAngularDamping = 5f; // Normal angular damping when not drifting
-    public float driftExitSnapiness = 0.3f; // How quickly car straightens when exiting drift (0-1)
-    public float counterSteerAssist = 0.4f; // Helps prevent spin-outs (0-1)
-    
-    [Header("Visual Settings")]
-    public float wheelSmoothSpeed = 15f; // Higher = snappier, Lower = more realistic
-    public float landingDampBoost = 2f; // Extra dampening when hitting ground
-    
+
+    [Header("Physics")]
+    public float angularDamping = 5f;
+    public float maxAngularVelocity = 3.5f;
+
+    [Header("Stability")]
+    public float sleepVelocityThreshold = 0.1f;
+    public float sleepAngularThreshold = 0.1f;
+
+    [Header("Boost System")]
+    public float boostMaxSpeedMultiplier = 1.5f;  // Max speed becomes 45 instead of 30
+    public float boostPowerMultiplier = 1.3f;     // Extra acceleration during boost
+    public float boostInitialForce = 8f;          // Instant speed kick when boost starts
+
     [Header("Center of Mass")]
     public Transform centerOfMass;
-    
+
     [Header("Debug")]
     public bool showDebugRays = true;
-    
+
     private Rigidbody rb;
+    private Transform[] allWheels;
     private float motorInput;
     private float steerInput;
     private float currentSteerAngle;
-    private bool isDrifting;
-    private bool wasDrifting;
-    private float driftDirection; // -1 for left, 1 for right
-    private Transform[] allWheels;
-    private Vector3[] wheelTargetPositions = new Vector3[4];
+    private bool isAsleep = false;
     
+    // Boost state
+    private bool isBoosting = false;
+    private float boostTimer = 0f;
+    private float boostDuration = 0f;
+    
+    // Speed display
+    private int lastSpeedTier = 0;
+
     void Start()
     {
         rb = GetComponent<Rigidbody>();
-        
-        // Set center of mass
-        if (centerOfMass != null)
+        rb.angularDamping = angularDamping;
+
+        rb.centerOfMass = centerOfMass != null
+            ? centerOfMass.localPosition
+            : new Vector3(0, -0.5f, 0);
+
+        allWheels = new Transform[]
         {
-            rb.centerOfMass = centerOfMass.localPosition;
-        }
-        else
-        {
-            rb.centerOfMass = new Vector3(0, -0.5f, 0);
-        }
-        
-        // Set initial angular damping
-        rb.angularDamping = normalAngularDamping;
-        
-        // Store all wheel transforms for easy iteration
-        allWheels = new Transform[] 
-        { 
-            frontLeftWheel, frontRightWheel, 
-            rearLeftWheel, rearRightWheel 
+            frontLeftWheel,
+            frontRightWheel,
+            rearLeftWheel,
+            rearRightWheel
         };
-        
-        // Initialize wheel target positions array
-        wheelTargetPositions = new Vector3[4];
-        
-        // Validate setup
-        foreach (var wheel in allWheels)
-        {
-            if (wheel == null)
-            {
-                Debug.LogError("Missing wheel transform assignment!");
-            }
-        }
     }
-    
+
     void Update()
     {
-        if (!enabled) return;
+        CaptureInput();
+        UpdateSteering();
+        UpdateBoost();
+        DisplaySpeed();
+    }
+
+    void FixedUpdate()
+    {
+        CheckSleepState();
         
-        // Get input
+        if (!isAsleep)
+        {
+            ApplyWheelForces();
+        }
+        
+        EnforceSpeedLimits();
+        ClampAngularVelocity();
+        UpdateWheelVisuals();
+    }
+
+    void CaptureInput()
+    {
         motorInput = Input.GetAxis("Vertical");
         steerInput = Input.GetAxis("Horizontal");
-        
-        // Handle drift state
-        float currentSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
-        bool driftPressed = Input.GetKey(driftKey);
-        
-        wasDrifting = isDrifting;
-        
-        // Check if we can/should be drifting
-        if (driftPressed && Mathf.Abs(currentSpeed) >= minSpeedToDrift && Mathf.Abs(steerInput) > 0.1f)
+    }
+
+    void CheckSleepState()
+    {
+        float speed = rb.linearVelocity.magnitude;
+        float angularSpeed = rb.angularVelocity.magnitude;
+        bool hasInput = Mathf.Abs(motorInput) > 0.01f || Mathf.Abs(steerInput) > 0.01f;
+
+        if (speed < sleepVelocityThreshold && angularSpeed < sleepAngularThreshold && !hasInput)
         {
-            if (!isDrifting)
+            if (!isAsleep)
             {
-                // Just started drifting - record direction
-                driftDirection = Mathf.Sign(steerInput);
+                isAsleep = true;
+                // Fully stop the vehicle
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
             }
-            isDrifting = true;
-        }
-        else if (!driftPressed)
-        {
-            isDrifting = false;
-        }
-        
-        // Update angular damping based on drift state
-        if (isDrifting)
-        {
-            rb.angularDamping = driftAngularDamping;
         }
         else
         {
-            rb.angularDamping = normalAngularDamping;
+            isAsleep = false;
         }
-        
-        // Update steering angle smoothly with speed-based reduction
-        float speedFactor = steerCurveBySpeed.Evaluate(Mathf.Abs(currentSpeed));
-        float steerBoost = isDrifting ? driftSteerBoost : 1f;
-        float targetSteerAngle = steerInput * maxSteeringAngle * speedFactor * steerBoost;
-        currentSteerAngle = Mathf.Lerp(currentSteerAngle, targetSteerAngle, Time.deltaTime * steerSpeed);
     }
-    
-    void FixedUpdate()
+
+    void UpdateSteering()
     {
-        // Apply drift physics
-        ApplyDriftPhysics();
+        float speed = rb.linearVelocity.magnitude;
+        float speedFactor = steerCurveBySpeed.Evaluate(speed);
+        float targetSteer = steerInput * maxSteeringAngle * speedFactor;
         
-        // Apply physics forces at each wheel
+        currentSteerAngle = Mathf.Lerp(
+            currentSteerAngle,
+            targetSteer,
+            Time.deltaTime * steerSpeed
+        );
+    }
+
+    void UpdateBoost()
+    {
+        if (isBoosting)
+        {
+            boostTimer += Time.deltaTime;
+            
+            // Check if boost duration is over
+            if (boostTimer >= boostDuration)
+            {
+                isBoosting = false;
+                boostTimer = 0f;
+            }
+        }
+    }
+
+    void DisplaySpeed()
+    {
+        // Get forward speed
+        float forwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
+        
+        // Round to nearest 10
+        int currentSpeedTier = Mathf.FloorToInt(Mathf.Abs(forwardSpeed) / 10f) * 10;
+        
+        // Only log when we cross into a new tier
+        if (currentSpeedTier != lastSpeedTier && currentSpeedTier > 0)
+        {
+            string boostIndicator = isBoosting ? " [BOOST]" : "";
+            Debug.Log($"Speed: {currentSpeedTier}+{boostIndicator}");
+            lastSpeedTier = currentSpeedTier;
+        }
+        // Reset if we drop below 10
+        else if (currentSpeedTier == 0 && lastSpeedTier != 0)
+        {
+            lastSpeedTier = 0;
+        }
+    }
+
+    // Public method for SpeedBoost to call
+    public void ActivateBoost(float duration)
+    {
+        // If already boosting, extend the duration
+        if (isBoosting)
+        {
+            boostDuration = Mathf.Max(boostDuration, duration);
+            boostTimer = 0f;
+        }
+        else
+        {
+            isBoosting = true;
+            boostDuration = duration;
+            boostTimer = 0f;
+            
+            // Give instant speed kick
+            rb.AddForce(transform.forward * boostInitialForce, ForceMode.VelocityChange);
+        }
+    }
+
+    // Public getter for boost state
+    public bool IsBoosting()
+    {
+        return isBoosting;
+    }
+
+    // Public getter for boost remaining time (for UI)
+    public float GetBoostTimeRemaining()
+    {
+        return isBoosting ? (boostDuration - boostTimer) : 0f;
+    }
+
+    void ApplyWheelForces()
+    {
         foreach (Transform wheel in allWheels)
         {
-            if (wheel != null)
-            {
-                ApplyWheelForces(wheel);
-            }
+            ProcessWheel(wheel);
         }
-        
-        // Enforce speed limits
-        EnforceSpeedLimits();
-        
-        // Update visual wheel meshes
-        UpdateWheelVisuals();
     }
-    
-    void ApplyDriftPhysics()
+
+    void ProcessWheel(Transform wheel)
     {
-        float currentSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
-        
-        // Only apply drift physics if we're actually drifting
-        if (isDrifting && Mathf.Abs(currentSpeed) >= minSpeedToDrift)
+        if (!Physics.Raycast(
+            wheel.position,
+            -wheel.up,
+            out RaycastHit hit,
+            suspensionRestDistance + maxSuspensionTravel))
         {
-            // Apply torque to rotate the car in drift direction
-            float torqueAmount = steerInput * driftTorque;
-            rb.AddTorque(transform.up * torqueAmount);
-            
-            // Counter-steer assist: if player is steering opposite to drift, help straighten out
-            if (Mathf.Sign(steerInput) != Mathf.Sign(driftDirection) && Mathf.Abs(steerInput) > 0.3f)
-            {
-                // Apply counter-torque to prevent spin-out
-                Vector3 angularVel = rb.angularVelocity;
-                float yawVelocity = Vector3.Dot(angularVel, transform.up);
-                rb.AddTorque(-transform.up * yawVelocity * counterSteerAssist * 1000f);
-            }
+            return;
         }
-        // Exiting drift - help straighten the car
-        else if (wasDrifting && !isDrifting)
+
+        Vector3 suspensionForce = CalculateSuspensionForce(wheel, hit);
+        Vector3 steeringForce = CalculateSteeringForce(wheel);
+        Vector3 driveForce = CalculateDriveForce(wheel);
+
+        rb.AddForceAtPosition(suspensionForce, wheel.position);
+        rb.AddForceAtPosition(steeringForce, wheel.position);
+        rb.AddForceAtPosition(driveForce, wheel.position);
+
+        if (showDebugRays)
         {
-            // Snap velocity more towards forward direction
-            Vector3 forwardVel = transform.forward * Vector3.Dot(rb.linearVelocity, transform.forward);
-            Vector3 sidewaysVel = transform.right * Vector3.Dot(rb.linearVelocity, transform.right);
-            
-            // Reduce sideways velocity to help straighten out
-            rb.linearVelocity = Vector3.Lerp(
-                rb.linearVelocity,
-                forwardVel + sidewaysVel * (1f - driftExitSnapiness),
-                0.3f
-            );
-            
-            // Also dampen angular velocity
-            rb.angularVelocity *= 0.7f;
+            Debug.DrawRay(wheel.position, -wheel.up * hit.distance, Color.green);
         }
     }
-    
-    void ApplyWheelForces(Transform wheel)
-    {
-        RaycastHit hit;
-        
-        // Cast ray from wheel position downward
-        if (Physics.Raycast(wheel.position, -wheel.up, out hit, suspensionRestDistance + maxSuspensionTravel))
-        {
-            // Calculate all three force components
-            Vector3 suspensionForce = CalculateSuspensionForce(wheel, hit);
-            Vector3 steeringForce = CalculateSteeringForce(wheel);
-            Vector3 driveForce = CalculateDriveForce(wheel);
-            
-            // Apply forces at wheel position
-            rb.AddForceAtPosition(suspensionForce, wheel.position);
-            rb.AddForceAtPosition(steeringForce, wheel.position);
-            rb.AddForceAtPosition(driveForce, wheel.position);
-            
-            // Debug visualization
-            if (showDebugRays)
-            {
-                Debug.DrawRay(wheel.position, suspensionForce.normalized * 0.5f, Color.green);
-                Debug.DrawRay(wheel.position, steeringForce.normalized * 0.5f, Color.red);
-                Debug.DrawRay(wheel.position, driveForce.normalized * 0.5f, Color.blue);
-            }
-        }
-    }
-    
+
     Vector3 CalculateSuspensionForce(Transform wheel, RaycastHit hit)
     {
-        // How much is the spring compressed?
         float offset = suspensionRestDistance - hit.distance;
-        
-        // Spring force (Hooke's Law: F = -kx)
         float springForce = offset * springStrength;
-        
-        // Damper force (opposes velocity)
+
         Vector3 wheelVelocity = rb.GetPointVelocity(wheel.position);
         float verticalVelocity = Vector3.Dot(wheel.up, wheelVelocity);
-        float damperForce = verticalVelocity * springDamper;
-        
-        // LANDING BOOST: If hitting ground hard (high downward velocity), add extra spring force
-        if (verticalVelocity < -5f && offset > 0.05f) // Moving down fast and spring is compressed
+        float damperForce = -verticalVelocity * springDamper;
+
+        // Apply extra force on hard landings
+        if (verticalVelocity < -5f && offset > 0.05f)
         {
             springForce *= landingForceMultiplier;
         }
-        
-        // Combined suspension force pointing upward
-        float totalForce = springForce - damperForce;
-        return wheel.up * totalForce;
+
+        return wheel.up * (springForce + damperForce);
     }
-    
+
     Vector3 CalculateSteeringForce(Transform wheel)
     {
-        // Get current velocity at this wheel position
         Vector3 wheelVelocity = rb.GetPointVelocity(wheel.position);
-        
-        // Determine steering direction based on wheel rotation
-        Vector3 steeringDir;
-        if (IsFrontWheel(wheel))
-        {
-            // Front wheels steer - rotate the right vector by steer angle
-            steeringDir = Quaternion.AngleAxis(currentSteerAngle, wheel.up) * wheel.right;
-        }
-        else
-        {
-            // Rear wheels don't steer
-            steeringDir = wheel.right;
-        }
-        
-        // Calculate sideways slip velocity
-        float steeringVelocity = Vector3.Dot(steeringDir, wheelVelocity);
-        
-        // Apply grip reduction during drift
-        float gripMultiplier = isDrifting ? driftGripReduction : 1f;
-        
-        // REAR WHEELS GET EXTRA GRIP REDUCTION during drift for better sliding
-        if (isDrifting && !IsFrontWheel(wheel))
-        {
-            gripMultiplier *= 0.7f; // Even less grip on rear wheels
-        }
-        
-        // Calculate desired velocity change (we want to eliminate slip)
-        float desiredVelocityChange = -steeringVelocity * sidewaysGripFactor * gripMultiplier;
-        
-        // F = ma, so calculate required acceleration
-        float desiredAcceleration = desiredVelocityChange / Time.fixedDeltaTime;
-        
-        return steeringDir * (tireMass * desiredAcceleration);
+
+        Vector3 steeringDirection = IsFrontWheel(wheel)
+            ? Quaternion.AngleAxis(currentSteerAngle, wheel.up) * wheel.right
+            : wheel.right;
+
+        float sidewaysSlip = Vector3.Dot(steeringDirection, wheelVelocity);
+        float desiredAcceleration = (-sidewaysSlip * sidewaysGripFactor) / Time.fixedDeltaTime;
+
+        return steeringDirection * desiredAcceleration * tireMass;
     }
-    
+
     Vector3 CalculateDriveForce(Transform wheel)
     {
         // Only rear wheels drive
@@ -311,197 +296,112 @@ public class CustomVehicleController : MonoBehaviour
         {
             return Vector3.zero;
         }
-        
-        // Get forward velocity at wheel
+
         Vector3 wheelVelocity = rb.GetPointVelocity(wheel.position);
         float forwardSpeed = Vector3.Dot(wheel.forward, wheelVelocity);
-        
-        float availablePower = 0f;
-        
-        // Forward drive
-        if (motorInput > 0)
+        float drivePower = 0f;
+
+        if (motorInput > 0f)
         {
-            // Scale power by speed curve
-            float powerMultiplier = powerCurveBySpeed.Evaluate(Mathf.Abs(forwardSpeed));
-            availablePower = motorInput * motorPower * powerMultiplier;
+            // Accelerate forward
+            float speedCurveFactor = powerCurveBySpeed.Evaluate(Mathf.Abs(forwardSpeed));
+            drivePower = motorInput * motorPower * speedCurveFactor;
             
-            // Boost power slightly during drift for maintaining speed
-            if (isDrifting)
+            // Apply boost power multiplier
+            if (isBoosting)
             {
-                availablePower *= 1.2f;
+                drivePower *= boostPowerMultiplier;
             }
         }
-        // Reverse drive
-        else if (motorInput < 0)
+        else if (motorInput < 0f)
         {
-            // If moving forward, apply brakes instead
+            // Brake or reverse
             if (forwardSpeed > 1f)
             {
-                availablePower = -Mathf.Sign(forwardSpeed) * brakePower;
+                // Apply brakes
+                drivePower = -Mathf.Sign(forwardSpeed) * brakePower;
             }
             else
             {
-                // Actually reverse
-                float powerMultiplier = powerCurveBySpeed.Evaluate(Mathf.Abs(forwardSpeed));
-                availablePower = motorInput * reversePower * powerMultiplier;
+                // Reverse
+                drivePower = motorInput * reversePower;
             }
         }
-        // Braking (no input)
         else
         {
-            // Apply light rolling resistance (less during drift)
-            float resistanceMultiplier = isDrifting ? 0.5f : 1f;
-            availablePower = -Mathf.Sign(forwardSpeed) * forwardGripFactor * 1000f * resistanceMultiplier;
+            // No input - apply rolling resistance
+            drivePower = -Mathf.Sign(forwardSpeed) * forwardGripFactor * 1000f;
         }
-        
-        return wheel.forward * availablePower;
+
+        return wheel.forward * drivePower;
     }
-    
+
     void EnforceSpeedLimits()
     {
         float forwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
         
-        // Forward speed limit
-        if (motorInput > 0 && forwardSpeed > maxSpeed)
+        // Calculate effective max speed (boosted or normal)
+        float effectiveMaxSpeed = isBoosting ? (maxSpeed * boostMaxSpeedMultiplier) : maxSpeed;
+
+        if (forwardSpeed > effectiveMaxSpeed)
         {
-            Vector3 excessVelocity = transform.forward * (forwardSpeed - maxSpeed);
-            rb.linearVelocity -= excessVelocity;
+            rb.linearVelocity -= transform.forward * (forwardSpeed - effectiveMaxSpeed);
         }
-        // Reverse speed limit
-        else if (motorInput < 0 && forwardSpeed < -maxReverseSpeed)
+        else if (forwardSpeed < -maxReverseSpeed)
         {
-            Vector3 excessVelocity = transform.forward * (forwardSpeed + maxReverseSpeed);
-            rb.linearVelocity -= excessVelocity;
+            rb.linearVelocity -= transform.forward * (forwardSpeed + maxReverseSpeed);
         }
     }
-    
+
+    void ClampAngularVelocity()
+    {
+        rb.angularVelocity = Vector3.ClampMagnitude(rb.angularVelocity, maxAngularVelocity);
+    }
+
     void UpdateWheelVisuals()
     {
-        UpdateSingleWheelVisual(frontLeftWheel, frontLeftMesh, 0);
-        UpdateSingleWheelVisual(frontRightWheel, frontRightMesh, 1);
-        UpdateSingleWheelVisual(rearLeftWheel, rearLeftMesh, 2);
-        UpdateSingleWheelVisual(rearRightWheel, rearRightMesh, 3);
+        UpdateWheelMesh(frontLeftWheel, frontLeftMesh);
+        UpdateWheelMesh(frontRightWheel, frontRightMesh);
+        UpdateWheelMesh(rearLeftWheel, rearLeftMesh);
+        UpdateWheelMesh(rearRightWheel, rearRightMesh);
     }
-    
-    void UpdateSingleWheelVisual(Transform wheelTransform, Transform wheelMesh, int wheelIndex)
+
+    void UpdateWheelMesh(Transform wheel, Transform mesh)
     {
-        if (wheelTransform == null || wheelMesh == null) return;
-        
-        RaycastHit hit;
-        Vector3 targetPosition;
-        bool isGrounded = false;
-        
-        if (Physics.Raycast(wheelTransform.position, -wheelTransform.up, out hit, suspensionRestDistance + maxSuspensionTravel))
+        if (wheel == null || mesh == null)
         {
-            isGrounded = true;
-            // Wheel is grounded - position at contact point plus wheel radius
-            targetPosition = hit.point + wheelTransform.up * wheelRadius;
+            return;
         }
-        else
+
+        // Update wheel position based on suspension
+        if (Physics.Raycast(
+            wheel.position,
+            -wheel.up,
+            out RaycastHit hit,
+            suspensionRestDistance + maxSuspensionTravel))
         {
-            // Wheel is in the air - extend to max suspension travel
-            targetPosition = wheelTransform.position - wheelTransform.up * (suspensionRestDistance + maxSuspensionTravel - wheelRadius);
+            mesh.position = hit.point + wheel.up * wheelRadius;
         }
-        
-        // CRITICAL FIX: If wheels drifted too far during air time, snap them back
-        float distanceToTarget = Vector3.Distance(wheelMesh.position, targetPosition);
-        if (isGrounded && distanceToTarget > suspensionRestDistance * 1.5f)
+
+        // Update steering rotation for front wheels
+        if (IsFrontWheel(wheel))
         {
-            // Snap to extended position
-            wheelMesh.position = wheelTransform.position - wheelTransform.up * (suspensionRestDistance + maxSuspensionTravel - wheelRadius);
-        }
-        
-        // Determine smooth speed
-        float currentSmoothSpeed = wheelSmoothSpeed;
-        if (isGrounded)
-        {
-            Vector3 toTarget = targetPosition - wheelMesh.position;
-            if (Vector3.Dot(toTarget, wheelTransform.up) > 0) // Moving upward (compressing)
-            {
-                currentSmoothSpeed *= landingDampBoost;
-            }
-        }
-        
-        // Smoothly interpolate to target position
-        wheelMesh.position = Vector3.Lerp(
-            wheelMesh.position, 
-            targetPosition, 
-            Time.fixedDeltaTime * currentSmoothSpeed
-        );
-        
-        // Rotate wheel based on speed
-        Vector3 wheelVelocity = rb.GetPointVelocity(wheelTransform.position);
-        float forwardSpeed = Vector3.Dot(wheelTransform.forward, wheelVelocity);
-        float rotationSpeed = (forwardSpeed / (2 * Mathf.PI * wheelRadius)) * 360f * Time.fixedDeltaTime;
-        wheelMesh.Rotate(Vector3.right, rotationSpeed, Space.Self);
-        
-        // Apply steering rotation to front wheels
-        if (IsFrontWheel(wheelTransform))
-        {
-            // Smoothly rotate steering
             Quaternion targetRotation = Quaternion.Euler(
-                wheelMesh.localRotation.eulerAngles.x, 
-                currentSteerAngle, 
-                0
+                mesh.localRotation.eulerAngles.x,
+                currentSteerAngle,
+                mesh.localRotation.eulerAngles.z
             );
-            wheelMesh.localRotation = Quaternion.Slerp(
-                wheelMesh.localRotation, 
-                targetRotation, 
+
+            mesh.localRotation = Quaternion.Slerp(
+                mesh.localRotation,
+                targetRotation,
                 Time.fixedDeltaTime * steerSpeed
             );
         }
     }
-    
+
     bool IsFrontWheel(Transform wheel)
     {
-        // Front wheels have positive Z in local space
         return wheel.localPosition.z > 0;
-    }
-    
-    // Public getter for drift state
-    public bool IsDrifting()
-    {
-        return isDrifting;
-    }
-    
-    // Public getter for drift angle (useful for UI/effects)
-    public float GetDriftAngle()
-    {
-        if (!isDrifting) return 0f;
-        
-        // Calculate angle between velocity and forward direction
-        Vector3 velocity = rb.linearVelocity;
-        if (velocity.magnitude < 0.1f) return 0f;
-        
-        Vector3 velocityDir = velocity.normalized;
-        Vector3 forwardDir = transform.forward;
-        
-        float angle = Vector3.SignedAngle(forwardDir, velocityDir, Vector3.up);
-        return angle;
-    }
-    
-    void OnDrawGizmos()
-    {
-        if (!Application.isPlaying || allWheels == null) return;
-        
-        // Draw suspension travel visualization
-        foreach (Transform wheel in allWheels)
-        {
-            if (wheel != null)
-            {
-                Gizmos.color = Color.yellow;
-                Gizmos.DrawWireSphere(wheel.position, 0.1f);
-                Gizmos.DrawLine(wheel.position, wheel.position - wheel.up * (suspensionRestDistance + maxSuspensionTravel));
-            }
-        }
-        
-        // Draw drift direction indicator when drifting
-        if (isDrifting)
-        {
-            Gizmos.color = Color.cyan;
-            Vector3 driftIndicator = transform.position + transform.up * 2f;
-            Gizmos.DrawWireSphere(driftIndicator, 0.3f);
-            Gizmos.DrawRay(driftIndicator, transform.right * driftDirection * 2f);
-        }
     }
 }
