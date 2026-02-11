@@ -27,25 +27,26 @@ public class VehicleController : MonoBehaviour
     [Header("Steering")]
     public float minSpeedForSteering = 2f;
     
-    [Header("Drifting")]
-    public KeyCode driftKey = KeyCode.Space;
-    public float driftForce = 15f;               // Force applied sideways during drift
-    public float minSpeedToDrift = 5f;           // Minimum speed required to drift
-    public float driftControlMultiplier = 1.8f;  // Extra control during drift
-    public float driftDrag = 0.98f;              // Slight speed reduction during drift
-    
     [Header("Center of Mass")]
     public Transform centerOfMass;
+    
+    [Header("Engine Sound")]
+    public AudioSource engineSound;
+    public float minPitch = 0.5f;
+    public float maxPitch = 2f;
+    public float pitchSpeedFactor = 30f;  // Speed at which pitch reaches maximum
+    public float minVolume = 0.3f;
+    public float maxVolume = 1f;
+    
+    [Header("Physics Correction")]
+    public float forwardGripStrength = 30f;  // Prevents sideways sliding
+    public float sidewaysDragMultiplier = 3f; // Extra drag on sideways movement
     
     private Rigidbody rb;
     private float motorInput;
     private float steerInput;
     private float currentSpeed;
     private float currentAcceleration = 0f;
-    
-    // Drift state
-    private bool isDrifting = false;
-    private int driftDirection = 0;  // -1 for left, 1 for right, 0 for none
 
     void Start()
     {
@@ -58,6 +59,13 @@ public class VehicleController : MonoBehaviour
         else
         {
             rb.centerOfMass = new Vector3(0, -0.8f, 0);  // Lower for stability
+        }
+        
+        // Setup engine sound
+        if (engineSound != null)
+        {
+            engineSound.loop = true;
+            engineSound.Play();
         }
     }
 
@@ -80,47 +88,39 @@ public class VehicleController : MonoBehaviour
             currentAcceleration = Mathf.MoveTowards(currentAcceleration, 0f, 2f * Time.deltaTime);
         }
         
-        // Handle drift input
-        HandleDriftInput(speedMagnitude);
+        // Update engine sound based on speed
+        UpdateEngineSound(speedMagnitude);
     }
 
-    void HandleDriftInput(float speed)
+    void UpdateEngineSound(float speed)
     {
-        bool driftPressed = Input.GetKey(driftKey);
+        if (engineSound == null) return;
         
-        // START DRIFTING - lock in the direction when space is pressed
-        if (driftPressed && !isDrifting && speed >= minSpeedToDrift && Mathf.Abs(steerInput) > 0.1f)
+        // Calculate pitch based on speed (0 to pitchSpeedFactor)
+        float speedRatio = Mathf.Clamp01(speed / pitchSpeedFactor);
+        float targetPitch = Mathf.Lerp(minPitch, maxPitch, speedRatio);
+        
+        // Add slight variation based on acceleration input
+        if (Mathf.Abs(motorInput) > 0.1f)
         {
-            isDrifting = true;
-            // Lock drift direction based on current steering
-            driftDirection = steerInput > 0 ? 1 : -1;
+            targetPitch += 0.2f * Mathf.Abs(motorInput);
         }
         
-        // STOP DRIFTING - release space
-        if (!driftPressed && isDrifting)
-        {
-            isDrifting = false;
-            driftDirection = 0;
-        }
+        engineSound.pitch = Mathf.Lerp(engineSound.pitch, targetPitch, Time.deltaTime * 5f);
+        
+        // Volume increases with speed too
+        float targetVolume = Mathf.Lerp(minVolume, maxVolume, speedRatio * 0.5f + Mathf.Abs(motorInput) * 0.5f);
+        engineSound.volume = Mathf.Lerp(engineSound.volume, targetVolume, Time.deltaTime * 3f);
     }
 
     void FixedUpdate()
     {
-        // MARIO KART STYLE DRIFT PHYSICS
-        if (isDrifting)
-        {
-            // Apply sideways drift force in the locked direction
-            Vector3 driftForceVector = transform.right * driftDirection * driftForce;
-            rb.AddForce(driftForceVector, ForceMode.Acceleration);
-            
-            // Slight speed reduction during drift
-            rb.linearVelocity *= driftDrag;
-        }
+        // FIX SIDEWAYS DRIVING - Apply forward grip force
+        PreventSidewaysSliding();
         
-        // Steering - boosted control during drift
+        // Steering with speed-based control
         float speedFactor = Mathf.Clamp01(Mathf.Abs(currentSpeed) / minSpeedForSteering);
-        float steerMultiplier = isDrifting ? driftControlMultiplier : 1f;
-        float actualSteerAngle = steerInput * maxSteeringAngle * speedFactor * steerMultiplier;
+        float actualSteerAngle = steerInput * maxSteeringAngle * speedFactor;
         
         frontLeftWheel.steerAngle = actualSteerAngle;
         frontRightWheel.steerAngle = actualSteerAngle;
@@ -182,6 +182,7 @@ public class VehicleController : MonoBehaviour
         {
             rearLeftWheel.motorTorque = 0;
             rearRightWheel.motorTorque = 0;
+            ApplyBraking(brakeTorque * 0.3f);
             
             // Additional deceleration
             if (rb.linearVelocity.magnitude > 0.1f)
@@ -207,6 +208,27 @@ public class VehicleController : MonoBehaviour
         UpdateWheelPose(rearRightWheel, rearRightTransform);
     }
 
+    void PreventSidewaysSliding()
+    {
+        // Get the car's right vector (sideways direction)
+        Vector3 sidewaysVelocity = transform.right * Vector3.Dot(rb.linearVelocity, transform.right);
+        
+        // Calculate how much we're sliding sideways
+        float sidewaysSpeed = sidewaysVelocity.magnitude;
+        
+        // Only apply correction if moving significantly
+        if (rb.linearVelocity.magnitude > 1f && sidewaysSpeed > 0.5f)
+        {
+            // Apply force opposite to sideways motion (grip force)
+            Vector3 correctionForce = -sidewaysVelocity * forwardGripStrength;
+            rb.AddForce(correctionForce, ForceMode.Acceleration);
+            
+            // Also increase drag on sideways movement
+            Vector3 sidewaysDrag = -sidewaysVelocity * sidewaysDragMultiplier;
+            rb.AddForce(sidewaysDrag, ForceMode.Acceleration);
+        }
+    }
+
     void ApplyBraking(float brake)
     {
         frontLeftWheel.brakeTorque = brake;
@@ -225,11 +247,5 @@ public class VehicleController : MonoBehaviour
         
         transform.position = pos;
         transform.rotation = rot;
-    }
-    
-    // Public getter for UI or effects
-    public bool IsDrifting()
-    {
-        return isDrifting;
     }
 }

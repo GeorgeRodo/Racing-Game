@@ -49,15 +49,35 @@ public class CustomVehicleController : MonoBehaviour
     public float sleepAngularThreshold = 0.1f;
 
     [Header("Boost System")]
-    public float boostMaxSpeedMultiplier = 1.5f;  // Max speed becomes 45 instead of 30
-    public float boostPowerMultiplier = 1.3f;     // Extra acceleration during boost
-    public float boostInitialForce = 8f;          // Instant speed kick when boost starts
+    public float boostMaxSpeedMultiplier = 1.5f;
+    public float boostPowerMultiplier = 1.3f;
+    public float boostInitialForce = 8f;
 
     [Header("Center of Mass")]
     public Transform centerOfMass;
+    
+    [Header("Engine Sound System")]
+    [Tooltip("Plays once when vehicle starts")]
+    public AudioSource startupSound;
+    
+    [Tooltip("Idle sound - Very low speed/stationary")]
+    public AudioSource idleSound;
+    
+    [Tooltip("Low sound - Low to medium speed")]
+    public AudioSource lowSound;
+    
+    [Tooltip("Mid sound - Medium to high speed")]
+    public AudioSource midSound;
+    
+    [Header("Sound Tuning")]
+    public float volumeLerpSpeed = 5f;        // How quickly volume fades
+    public float lowSpeedThreshold = 10f;     // Speed where low sound is at max
+    public float midSpeedThreshold = 25f;     // Speed where mid sound is at max
+    public float masterVolume = 0.8f;         // Overall volume multiplier
 
     [Header("Debug")]
     public bool showDebugRays = true;
+    public bool showSoundDebug = false;  // Enable to see sound volumes in console
 
     private Rigidbody rb;
     private Transform[] allWheels;
@@ -73,6 +93,9 @@ public class CustomVehicleController : MonoBehaviour
     
     // Speed display
     private int lastSpeedTier = 0;
+    
+    // Engine sound state
+    private bool hasPlayedStartup = false;
 
     void Start()
     {
@@ -90,6 +113,27 @@ public class CustomVehicleController : MonoBehaviour
             rearLeftWheel,
             rearRightWheel
         };
+        
+        // Initialize engine sounds
+        InitializeEngineSound(idleSound);
+        InitializeEngineSound(lowSound);
+        InitializeEngineSound(midSound);
+        
+        // Startup sound plays once
+        if (startupSound != null)
+        {
+            startupSound.loop = false;
+        }
+    }
+    
+    void InitializeEngineSound(AudioSource source)
+    {
+        if (source != null)
+        {
+            source.loop = true;
+            source.volume = 0f;
+            source.Play();
+        }
     }
 
     void Update()
@@ -98,6 +142,7 @@ public class CustomVehicleController : MonoBehaviour
         UpdateSteering();
         UpdateBoost();
         DisplaySpeed();
+        UpdateEngineSound();
     }
 
     void FixedUpdate()
@@ -131,7 +176,6 @@ public class CustomVehicleController : MonoBehaviour
             if (!isAsleep)
             {
                 isAsleep = true;
-                // Fully stop the vehicle
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
             }
@@ -161,7 +205,6 @@ public class CustomVehicleController : MonoBehaviour
         {
             boostTimer += Time.deltaTime;
             
-            // Check if boost duration is over
             if (boostTimer >= boostDuration)
             {
                 isBoosting = false;
@@ -169,33 +212,86 @@ public class CustomVehicleController : MonoBehaviour
             }
         }
     }
+    
+    void UpdateEngineSound()
+    {
+        // Play startup sound once when vehicle first moves
+        if (!hasPlayedStartup && startupSound != null)
+        {
+            if (Mathf.Abs(motorInput) > 0.1f || rb.linearVelocity.magnitude > 1f)
+            {
+                startupSound.Play();
+                hasPlayedStartup = true;
+            }
+        }
+        
+        float speed = rb.linearVelocity.magnitude;
+        
+        // Calculate volume for each sound layer based on speed
+        float idleVolume = 0f;
+        float lowVolume = 0f;
+        float midVolume = 0f;
+        
+        // IDLE to LOW transition (0 to lowSpeedThreshold)
+        if (speed <= lowSpeedThreshold)
+        {
+            float transitionRatio = speed / lowSpeedThreshold;
+            idleVolume = 1f - transitionRatio;
+            lowVolume = transitionRatio;
+        }
+        // LOW to MID transition (lowSpeedThreshold to midSpeedThreshold)
+        else if (speed <= midSpeedThreshold)
+        {
+            float transitionRatio = (speed - lowSpeedThreshold) / (midSpeedThreshold - lowSpeedThreshold);
+            lowVolume = 1f - transitionRatio;
+            midVolume = transitionRatio;
+        }
+        // HIGH SPEED (above midSpeedThreshold)
+        else
+        {
+            midVolume = 1f;
+        }
+        
+        // Apply volumes with smooth lerping
+        SetSoundVolume(idleSound, idleVolume);
+        SetSoundVolume(lowSound, lowVolume);
+        SetSoundVolume(midSound, midVolume);
+        
+        // Debug output
+        if (showSoundDebug)
+        {
+            Debug.Log($"Speed: {speed:F1} | Idle: {idleVolume:F2} | Low: {lowVolume:F2} | Mid: {midVolume:F2}");
+        }
+    }
+    
+    void SetSoundVolume(AudioSource source, float targetVolume)
+    {
+        if (source == null) return;
+        
+        // Apply master volume and smooth lerp
+        float finalVolume = targetVolume * masterVolume;
+        source.volume = Mathf.Lerp(source.volume, finalVolume, Time.deltaTime * volumeLerpSpeed);
+    }
 
     void DisplaySpeed()
     {
-        // Get forward speed
         float forwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
-        
-        // Round to nearest 10
         int currentSpeedTier = Mathf.FloorToInt(Mathf.Abs(forwardSpeed) / 10f) * 10;
         
-        // Only log when we cross into a new tier
         if (currentSpeedTier != lastSpeedTier && currentSpeedTier > 0)
         {
             string boostIndicator = isBoosting ? " [BOOST]" : "";
             Debug.Log($"Speed: {currentSpeedTier}+{boostIndicator}");
             lastSpeedTier = currentSpeedTier;
         }
-        // Reset if we drop below 10
         else if (currentSpeedTier == 0 && lastSpeedTier != 0)
         {
             lastSpeedTier = 0;
         }
     }
 
-    // Public method for SpeedBoost to call
     public void ActivateBoost(float duration)
     {
-        // If already boosting, extend the duration
         if (isBoosting)
         {
             boostDuration = Mathf.Max(boostDuration, duration);
@@ -206,19 +302,15 @@ public class CustomVehicleController : MonoBehaviour
             isBoosting = true;
             boostDuration = duration;
             boostTimer = 0f;
-            
-            // Give instant speed kick
             rb.AddForce(transform.forward * boostInitialForce, ForceMode.VelocityChange);
         }
     }
 
-    // Public getter for boost state
     public bool IsBoosting()
     {
         return isBoosting;
     }
 
-    // Public getter for boost remaining time (for UI)
     public float GetBoostTimeRemaining()
     {
         return isBoosting ? (boostDuration - boostTimer) : 0f;
@@ -266,7 +358,6 @@ public class CustomVehicleController : MonoBehaviour
         float verticalVelocity = Vector3.Dot(wheel.up, wheelVelocity);
         float damperForce = -verticalVelocity * springDamper;
 
-        // Apply extra force on hard landings
         if (verticalVelocity < -5f && offset > 0.05f)
         {
             springForce *= landingForceMultiplier;
@@ -291,7 +382,6 @@ public class CustomVehicleController : MonoBehaviour
 
     Vector3 CalculateDriveForce(Transform wheel)
     {
-        // Only rear wheels drive
         if (IsFrontWheel(wheel))
         {
             return Vector3.zero;
@@ -303,11 +393,9 @@ public class CustomVehicleController : MonoBehaviour
 
         if (motorInput > 0f)
         {
-            // Accelerate forward
             float speedCurveFactor = powerCurveBySpeed.Evaluate(Mathf.Abs(forwardSpeed));
             drivePower = motorInput * motorPower * speedCurveFactor;
             
-            // Apply boost power multiplier
             if (isBoosting)
             {
                 drivePower *= boostPowerMultiplier;
@@ -315,21 +403,17 @@ public class CustomVehicleController : MonoBehaviour
         }
         else if (motorInput < 0f)
         {
-            // Brake or reverse
             if (forwardSpeed > 1f)
             {
-                // Apply brakes
                 drivePower = -Mathf.Sign(forwardSpeed) * brakePower;
             }
             else
             {
-                // Reverse
                 drivePower = motorInput * reversePower;
             }
         }
         else
         {
-            // No input - apply rolling resistance
             drivePower = -Mathf.Sign(forwardSpeed) * forwardGripFactor * 1000f;
         }
 
@@ -339,8 +423,6 @@ public class CustomVehicleController : MonoBehaviour
     void EnforceSpeedLimits()
     {
         float forwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
-        
-        // Calculate effective max speed (boosted or normal)
         float effectiveMaxSpeed = isBoosting ? (maxSpeed * boostMaxSpeedMultiplier) : maxSpeed;
 
         if (forwardSpeed > effectiveMaxSpeed)
@@ -373,7 +455,6 @@ public class CustomVehicleController : MonoBehaviour
             return;
         }
 
-        // Update wheel position based on suspension
         if (Physics.Raycast(
             wheel.position,
             -wheel.up,
@@ -383,7 +464,6 @@ public class CustomVehicleController : MonoBehaviour
             mesh.position = hit.point + wheel.up * wheelRadius;
         }
 
-        // Update steering rotation for front wheels
         if (IsFrontWheel(wheel))
         {
             Quaternion targetRotation = Quaternion.Euler(

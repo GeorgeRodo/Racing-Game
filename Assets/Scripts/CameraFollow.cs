@@ -22,18 +22,29 @@ public class CameraFollow : MonoBehaviour
     public float speedForMaxZoom = 25f;
     public float zoomSmoothing = 4f;
     
+    [Header("Boost Camera Effects")]
+    public float boostZoomDistance = 18f;     // Extra zoom back during boost
+    public float boostZoomSpeed = 8f;         // How fast camera zooms back
+    public float boostReturnSpeed = 3f;       // How fast camera returns to normal
+    public float boostFOVIncrease = 10f;      // Extra FOV during boost
+    
     [Header("Dynamic Camera")]
     public float maxSpeedFOV = 75f;
     public float normalFOV = 60f;
     
     private Camera cam;
     private Rigidbody targetRb;
+    private CustomVehicleController vehicleController;
     private Vector3 velocity = Vector3.zero;
     
     private float currentHorizontalAngle = 0f;
     private float currentVerticalAngle = 0f;
     private Vector3 currentOffset;
     private float currentDistance;
+    
+    // Boost state
+    private float boostDistanceModifier = 0f;
+    private float boostFOVModifier = 0f;
 
     void Start()
     {
@@ -41,6 +52,7 @@ public class CameraFollow : MonoBehaviour
         if (target != null)
         {
             targetRb = target.GetComponent<Rigidbody>();
+            vehicleController = target.GetComponent<CustomVehicleController>();
         }
         currentOffset = offset;
         currentDistance = offset.magnitude;
@@ -51,9 +63,17 @@ public class CameraFollow : MonoBehaviour
         if (target == null) return;
 
         float speed = targetRb != null ? targetRb.linearVelocity.magnitude : 0f;
+        bool isBoosting = vehicleController != null && vehicleController.IsBoosting();
         
+        // Handle boost camera zoom
+        UpdateBoostCamera(isBoosting);
+        
+        // Calculate base distance from speed
         float speedFactor = Mathf.Clamp01(speed / speedForMaxZoom);
         float targetDistance = Mathf.Lerp(minDistance, maxDistance, speedFactor);
+        
+        // Add boost distance modifier
+        targetDistance += boostDistanceModifier;
         
         currentDistance = Mathf.Lerp(currentDistance, targetDistance, zoomSmoothing * Time.deltaTime);
         
@@ -88,11 +108,29 @@ public class CameraFollow : MonoBehaviour
         Quaternion targetRotation = Quaternion.LookRotation(lookDirection);
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSmoothing * Time.deltaTime);
         
-        // Dynamic FOV only - NO SHAKE
+        // Dynamic FOV with boost modifier
         if (targetRb != null && cam != null)
         {
-            float targetFOV = Mathf.Lerp(normalFOV, maxSpeedFOV, speed / 25f);
+            float baseFOV = Mathf.Lerp(normalFOV, maxSpeedFOV, speed / 25f);
+            float targetFOV = baseFOV + boostFOVModifier;
             cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, targetFOV, Time.deltaTime * 3f);
+        }
+    }
+
+    void UpdateBoostCamera(bool isBoosting)
+    {
+        // Smoothly adjust boost modifiers
+        if (isBoosting)
+        {
+            // Zoom back and increase FOV during boost
+            boostDistanceModifier = Mathf.Lerp(boostDistanceModifier, boostZoomDistance - maxDistance, boostZoomSpeed * Time.deltaTime);
+            boostFOVModifier = Mathf.Lerp(boostFOVModifier, boostFOVIncrease, boostZoomSpeed * Time.deltaTime);
+        }
+        else
+        {
+            // Return to normal slowly
+            boostDistanceModifier = Mathf.Lerp(boostDistanceModifier, 0f, boostReturnSpeed * Time.deltaTime);
+            boostFOVModifier = Mathf.Lerp(boostFOVModifier, 0f, boostReturnSpeed * Time.deltaTime);
         }
     }
 }
