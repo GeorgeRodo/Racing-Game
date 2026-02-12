@@ -13,7 +13,10 @@ public class RaceManager : MonoBehaviour
     
     [Header("Track Reference")]
     public TrackCheckPoints trackCheckPoints;
-    
+
+    [Header("Audio Settings")]
+    public AudioSource raceMusic; // Σύρε εδώ το AudioSource της μουσικής
+
     private bool raceStarted = false;
     private bool countdownActive = false;
     private float raceTime = 0f;
@@ -81,7 +84,12 @@ public class RaceManager : MonoBehaviour
         raceStarted = true;
         countdownActive = false;
         raceTime = 0f;
-        
+
+        if (raceMusic != null)
+        {
+            raceMusic.Play();
+        }
+
         // Enable vehicle controls
         if (vehicleController != null)
         {
