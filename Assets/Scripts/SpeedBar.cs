@@ -6,93 +6,83 @@ public class SpeedBar : MonoBehaviour
 {
     [Header("References")]
     public Image fillBar;
+    public RectTransform needle; // Σύρε εδώ τη βελόνα (αν έχεις)
     public TextMeshProUGUI speedText;
     public Rigidbody vehicleRigidbody;
-    
+
     [Header("Speed Settings")]
-    public float maxSpeed = 30f;              // Max speed in m/s (matches your vehicle)
-    public bool useKMH = true;                // Display in KM/H
-    
+    public float maxSpeed = 160f;        // Τελική ταχύτητα σε KM/H
+    public float smoothing = 8f;         // Πόσο ομαλά κουνιέται η μπάρα
+
     [Header("Visual Settings")]
-    public Gradient speedGradient;            // Color gradient from slow to fast
-    public float smoothing = 5f;              // How smooth the bar fills
-    
-    private float currentFillAmount = 0f;
-    private float targetFillAmount = 0f;
+    public Gradient speedGradient;       // Χρώματα από πράσινο σε κόκκινο
+    public float minNeedleAngle = 180f;  // Γωνία βελόνας στο 0
+    public float maxNeedleAngle = -90f;  // Γωνία βελόνας στο τέρμα
+
+    [Header("Shake Effect")]
+    public bool enableShake = true;
+    public float shakeIntensity = 1.2f;
+
+    private float currentSpeedKMH;
+    private Vector3 originalTextPos;
 
     void Start()
     {
-        // Find vehicle if not assigned
+        if (speedText != null) originalTextPos = speedText.rectTransform.localPosition;
+
+        // Αν δεν έχεις βάλει Rigidbody, προσπαθεί να το βρει στο Taxi
         if (vehicleRigidbody == null)
         {
-            vehicleRigidbody = FindFirstObjectByType<VehicleController>()?.GetComponent<Rigidbody>();
-        }
-        
-        // ALWAYS create a new gradient to ensure it works
-        speedGradient = new Gradient();
-        
-        // Create color keys: Green -> Yellow -> Orange -> Red
-        GradientColorKey[] colorKeys = new GradientColorKey[4];
-        colorKeys[0].color = new Color(0.2f, 1f, 0.2f);    // Green at 0%
-        colorKeys[0].time = 0f;
-        colorKeys[1].color = new Color(1f, 1f, 0.2f);      // Yellow at 40%
-        colorKeys[1].time = 0.4f;
-        colorKeys[2].color = new Color(1f, 0.6f, 0.2f);    // Orange at 70%
-        colorKeys[2].time = 0.7f;
-        colorKeys[3].color = new Color(1f, 0.2f, 0.2f);    // Red at 100%
-        colorKeys[3].time = 1f;
-        
-        // Alpha keys (full opacity)
-        GradientAlphaKey[] alphaKeys = new GradientAlphaKey[2];
-        alphaKeys[0].alpha = 1f;
-        alphaKeys[0].time = 0f;
-        alphaKeys[1].alpha = 1f;
-        alphaKeys[1].time = 1f;
-        
-        speedGradient.SetKeys(colorKeys, alphaKeys);
-        
-        // Initialize fill bar
-        if (fillBar != null)
-        {
-            fillBar.fillAmount = 0f;
-            fillBar.type = Image.Type.Filled;
-            fillBar.fillMethod = Image.FillMethod.Horizontal;
-            fillBar.fillOrigin = (int)Image.OriginHorizontal.Left;
-            
-            // Set initial color to green
-            fillBar.color = speedGradient.Evaluate(0f);
+            vehicleRigidbody = GameObject.FindWithTag("Player")?.GetComponent<Rigidbody>();
         }
     }
 
     void Update()
     {
-        if (vehicleRigidbody == null || fillBar == null) return;
-        
-        // Get current speed
-        float speed = vehicleRigidbody.linearVelocity.magnitude;
-        
-        // Calculate fill amount (0 to 1)
-        float speedRatio = Mathf.Clamp01(speed / maxSpeed);
-        targetFillAmount = speedRatio;
-        
-        // Smooth fill animation
-        currentFillAmount = Mathf.Lerp(currentFillAmount, targetFillAmount, smoothing * Time.deltaTime);
-        fillBar.fillAmount = currentFillAmount;
-        
-        // Update color based on speed
-        fillBar.color = speedGradient.Evaluate(speedRatio);
-        
-        // Update speed text (OPTIONAL - only if assigned)
+        if (vehicleRigidbody == null) return;
+
+        // Υπολογισμός ταχύτητας σε KM/H
+        float realSpeedKMH = vehicleRigidbody.linearVelocity.magnitude * 3.6f;
+
+        // Smoothing: Κάνει την μπάρα να "γλιστράει" ομαλά αντί να πηδάει
+        currentSpeedKMH = Mathf.Lerp(currentSpeedKMH, realSpeedKMH, Time.deltaTime * smoothing);
+
+        float speedRatio = Mathf.Clamp01(currentSpeedKMH / maxSpeed);
+
+        UpdateSpeedUI(speedRatio);
+    }
+
+    void UpdateSpeedUI(float ratio)
+    {
+        // 1. Γέμισμα μπάρας
+        if (fillBar != null)
+        {
+            fillBar.fillAmount = ratio;
+            if (speedGradient != null)
+                fillBar.color = speedGradient.Evaluate(ratio);
+        }
+
+        // 2. Κίνηση βελόνας (προαιρετικό)
+        if (needle != null)
+        {
+            float targetAngle = Mathf.Lerp(minNeedleAngle, maxNeedleAngle, ratio);
+            needle.rotation = Quaternion.Euler(0, 0, targetAngle);
+        }
+
+        // 3. Κείμενο και Shake (Τρέμουλο)
         if (speedText != null)
         {
-            if (useKMH)
+            speedText.text = Mathf.RoundToInt(currentSpeedKMH).ToString();
+
+            // Το τρέμουλο ενεργοποιείται μετά το 80% της τελικής ταχύτητας
+            if (enableShake && ratio > 0.8f)
             {
-                float speedKMH = speed * 3.6f;
-                speedText.text = $"{Mathf.RoundToInt(speedKMH)} KM/H";
+                float shake = (ratio - 0.8f) * shakeIntensity * 12f;
+                speedText.rectTransform.localPosition = originalTextPos + (Vector3)Random.insideUnitCircle * shake;
             }
             else
             {
-                speedText.text = $"{Mathf.RoundToInt(speed)} M/S";
+                speedText.rectTransform.localPosition = originalTextPos;
             }
         }
     }

@@ -4,50 +4,47 @@ using System.Collections;
 
 public class RaceManager : MonoBehaviour
 {
-    [Header("Countdown Settings")]
-    public float countdownTime = 3f;
+    [Header("UI Settings")]
     public TextMeshProUGUI countdownText;
-    
+
+    [Header("Audio Settings")]
+    public AudioSource raceMusic; 
+
     [Header("Vehicle Reference")]
-    public CustomVehicleController vehicleController;
-    
+    public CustomVehicleController vehicleController; // Το script του αυτοκινήτου
+
     [Header("Track Reference")]
     public TrackCheckPoints trackCheckPoints;
-    
+
     private bool raceStarted = false;
-    private bool countdownActive = false;
     private float raceTime = 0f;
-    
+
     void Start()
     {
         if (countdownText != null)
-        {
             countdownText.gameObject.SetActive(true);
-        }
-        
-        // Disable vehicle controls at start
+
+        // Απενεργοποίηση κίνησης στην αρχή
         if (vehicleController != null)
-        {
             vehicleController.enabled = false;
-        }
-        
-        // Start countdown automatically
+
+        // Βεβαιώσου ότι η μουσική δεν παίζει από πριν
+        if (raceMusic != null)
+            raceMusic.Stop();
+
         StartCoroutine(CountdownSequence());
     }
 
     void Update()
     {
-        // Track race time
-        if (raceStarted && !trackCheckPoints.IsRaceFinished())
+        if (raceStarted && trackCheckPoints != null && !trackCheckPoints.IsRaceFinished())
         {
             raceTime += Time.deltaTime;
         }
     }
-    
+
     IEnumerator CountdownSequence()
     {
-        countdownActive = true;
-        
         for (int i = 3; i > 0; i--)
         {
             if (countdownText != null)
@@ -58,37 +55,34 @@ public class RaceManager : MonoBehaviour
             }
             yield return new WaitForSeconds(1f);
         }
-        
-        // Show "GO!"
+
         if (countdownText != null)
         {
             countdownText.text = "GO!";
             countdownText.color = Color.green;
         }
-        yield return new WaitForSeconds(0.5f);
-        
-        // Hide countdown and start race
-        if (countdownText != null)
-        {
-            countdownText.gameObject.SetActive(false);
-        }
-        
+
         StartRace();
+
+        yield return new WaitForSeconds(1.5f);
+
+        if (countdownText != null)
+            countdownText.gameObject.SetActive(false);
     }
-    
+
     void StartRace()
     {
         raceStarted = true;
-        countdownActive = false;
-        raceTime = 0f;
-        
-        // Enable vehicle controls
+
+        // Έναρξη μουσικής
+        if (raceMusic != null)
+            raceMusic.Play();
+
+        // Ενεργοποίηση κίνησης
         if (vehicleController != null)
-        {
             vehicleController.enabled = true;
-        }
     }
-    
+
     public bool IsRaceStarted() { return raceStarted; }
     public float GetRaceTime() { return raceTime; }
 }
