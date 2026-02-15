@@ -36,6 +36,11 @@ public class RaceManager : MonoBehaviour
     public float uiSlideInDuration = 0.8f;      // How long the slide animation takes
     public float uiSlideInDelay = 0.5f;         // Delay before UI slides in after GO
     public float uiOffsetDistance = 100f;       // How far to move UI off-screen (pixels)
+    
+    [Header("Countdown Animation")]
+    public float countdownDropDistance = 200f;  // How far above screen countdown starts
+    public float countdownDropDuration = 0.3f;  // How fast countdown drops down
+    public float countdownBounce = 20f;         // Bounce overshoot amount
 
     private bool raceStarted = false;
     private float raceTime = 0f;
@@ -43,11 +48,22 @@ public class RaceManager : MonoBehaviour
     // Store original positions
     private Vector2 lapOriginalPos;
     private Vector2 checkpointOriginalPos;
+    private Vector2 countdownOriginalPos;
+    private RectTransform countdownRectTransform;
 
     void Start()
     {
         if (countdownText != null)
+        {
             countdownText.gameObject.SetActive(true);
+            countdownRectTransform = countdownText.GetComponent<RectTransform>();
+            
+            // Store original position and hide off-screen
+            if (countdownRectTransform != null)
+            {
+                countdownOriginalPos = countdownRectTransform.anchoredPosition;
+            }
+        }
 
         // Disable vehicle controls until race starts
         if (vehicleController != null)
@@ -146,6 +162,9 @@ public class RaceManager : MonoBehaviour
                 countdownText.fontSize = 120;
             }
             
+            // Animate countdown drop in
+            StartCoroutine(AnimateCountdownDrop());
+            
             // Stop any previous countdown sound and play new one
             if (sfxSource != null && countdownBeep != null)
             {
@@ -163,6 +182,9 @@ public class RaceManager : MonoBehaviour
             countdownText.color = Color.green;
             countdownText.fontSize = 140;
         }
+        
+        // Animate GO! drop in (bigger!)
+        StartCoroutine(AnimateCountdownDrop());
         
         // Play GO! sound (different from countdown)
         if (sfxSource != null && goSound != null)
@@ -200,6 +222,54 @@ public class RaceManager : MonoBehaviour
 
     public bool IsRaceStarted() { return raceStarted; }
     public float GetRaceTime() { return raceTime; }
+    
+    IEnumerator AnimateCountdownDrop()
+    {
+        if (countdownRectTransform == null) yield break;
+        
+        // Start position (above screen)
+        Vector2 startPos = countdownOriginalPos + new Vector2(0f, countdownDropDistance);
+        
+        // Overshoot position (slightly below final position)
+        Vector2 overshootPos = countdownOriginalPos - new Vector2(0f, countdownBounce);
+        
+        countdownRectTransform.anchoredPosition = startPos;
+        
+        float elapsed = 0f;
+        
+        // Phase 1: Drop down with overshoot (70% of duration)
+        float phase1Duration = countdownDropDuration * 0.7f;
+        while (elapsed < phase1Duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / phase1Duration;
+            
+            // Ease in (accelerate as it falls)
+            float curvedT = t * t;
+            
+            countdownRectTransform.anchoredPosition = Vector2.Lerp(startPos, overshootPos, curvedT);
+            yield return null;
+        }
+        
+        // Phase 2: Bounce back to final position (30% of duration)
+        float phase2Duration = countdownDropDuration * 0.3f;
+        elapsed = 0f;
+        
+        while (elapsed < phase2Duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / phase2Duration;
+            
+            // Ease out (decelerate as it settles)
+            float curvedT = Mathf.Sin(t * Mathf.PI * 0.5f);
+            
+            countdownRectTransform.anchoredPosition = Vector2.Lerp(overshootPos, countdownOriginalPos, curvedT);
+            yield return null;
+        }
+        
+        // Ensure final position is exact
+        countdownRectTransform.anchoredPosition = countdownOriginalPos;
+    }
     
     IEnumerator SlideInUI()
     {
