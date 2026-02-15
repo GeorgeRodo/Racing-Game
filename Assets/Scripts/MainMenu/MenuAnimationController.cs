@@ -3,9 +3,8 @@ using UnityEngine.UI;
 using System.Collections;
 
 /// <summary>
-/// Animates main menu UI elements with smooth entrance animations
-/// Title slides in from left with overshoot
-/// Buttons fade in and slide up with stagger
+/// Animates main menu UI elements with smooth entrance and exit animations
+/// Each panel has enter and exit animations for smooth transitions
 /// </summary>
 public class MainMenuAnimations : MonoBehaviour
 {
@@ -18,11 +17,16 @@ public class MainMenuAnimations : MonoBehaviour
     
     [Header("Button Animations")]
     public RectTransform playButton;
+    public RectTransform creditsButton;
     public RectTransform exitButton;
     public float buttonSlideDistance = 100f;     // Slide up from below
     public float buttonDuration = 0.6f;          // Animation time per button
     public float buttonStagger = 0.15f;          // Delay between each button
     public float buttonStartDelay = 0.5f;        // Delay before first button
+    
+    [Header("Exit Animation Settings")]
+    public float exitDuration = 0.4f;            // How long exit animations take
+    public float exitStagger = 0.08f;            // Delay between elements exiting
     
     [Header("Track Panel - Back Button")]
     public RectTransform trackBackButton;
@@ -45,13 +49,43 @@ public class MainMenuAnimations : MonoBehaviour
     public float trackGridDuration = 0.4f;
     public float trackGridStartDelay = 0.3f;
     
+    [Header("Credits Panel - Back Button")]
+    public RectTransform creditsBackButton;
+    public float creditsBackSlideDistance = 200f;
+    public float creditsBackOvershoot = 30f;
+    public float creditsBackDuration = 0.6f;
+    public float creditsBackDelay = 0.1f;
+    
+    [Header("Credits Panel - Title")]
+    public RectTransform creditsPanelTitle;
+    public float creditsTitleDropDistance = 150f;
+    public float creditsTitleDuration = 0.5f;
+    public float creditsTitleDelay = 0.2f;
+    public float creditsTitlePulseAmount = 1.1f;   // Scale pulse (1.1 = 10% bigger)
+    public float creditsTitlePulseSpeed = 1.5f;    // Pulse frequency
+    
+    [Header("Credits Panel - Name Cards")]
+    public RectTransform creditsName1;           // First developer name card
+    public RectTransform creditsName2;           // Second developer name card
+    public float creditsNameSlideDistance = 200f;
+    public float creditsNameDuration = 0.5f;
+    public float creditsNameStagger = 0.2f;      // Delay between each name
+    public float creditsNameStartDelay = 0.4f;
+    
     [Header("Animation Curves")]
     public AnimationCurve titleEase = AnimationCurve.EaseInOut(0, 0, 1, 1);
     public AnimationCurve buttonEase = AnimationCurve.EaseInOut(0, 0, 1, 1);
+    public AnimationCurve exitEase = AnimationCurve.EaseInOut(0, 0, 1, 1);
     
-    // Store original positions
+    [Header("Panel CanvasGroups (for visibility control)")]
+    public CanvasGroup mainMenuCanvasGroup;
+    public CanvasGroup trackSelectionCanvasGroup;
+    public CanvasGroup creditsCanvasGroup;
+    
+    // Store original positions - Main Menu
     private Vector2 titleOriginalPos;
     private Vector2 playOriginalPos;
+    private Vector2 creditsOriginalPos;
     private Vector2 exitOriginalPos;
     
     // Track panel original positions
@@ -59,14 +93,26 @@ public class MainMenuAnimations : MonoBehaviour
     private Vector2 trackTitleOriginalPos;
     private Vector2 trackGridOriginalPos;
     
-    // Track title wiggle state
+    // Credits panel original positions
+    private Vector2 creditsBackOriginalPos;
+    private Vector2 creditsTitleOriginalPos;
+    private Vector2 creditsName1OriginalPos;
+    private Vector2 creditsName2OriginalPos;
+    
+    // Animation state
     private bool isTitleWiggling = false;
+    private bool isCreditsTitlePulsing = false;
+    
+    // Panel tracking
+    private enum ActivePanel { MainMenu, TrackSelection, Credits }
+    private ActivePanel currentPanel = ActivePanel.MainMenu;
     
     void Awake()
     {
         // Store original positions FIRST - Main Menu
         if (titleText != null) titleOriginalPos = titleText.anchoredPosition;
         if (playButton != null) playOriginalPos = playButton.anchoredPosition;
+        if (creditsButton != null) creditsOriginalPos = creditsButton.anchoredPosition;
         if (exitButton != null) exitOriginalPos = exitButton.anchoredPosition;
         
         // Store original positions - Track Panel
@@ -74,12 +120,40 @@ public class MainMenuAnimations : MonoBehaviour
         if (trackPanelTitle != null) trackTitleOriginalPos = trackPanelTitle.anchoredPosition;
         if (trackGridContainer != null) trackGridOriginalPos = trackGridContainer.anchoredPosition;
         
+        // Store original positions - Credits Panel
+        if (creditsBackButton != null) creditsBackOriginalPos = creditsBackButton.anchoredPosition;
+        if (creditsPanelTitle != null) creditsTitleOriginalPos = creditsPanelTitle.anchoredPosition;
+        if (creditsName1 != null) creditsName1OriginalPos = creditsName1.anchoredPosition;
+        if (creditsName2 != null) creditsName2OriginalPos = creditsName2.anchoredPosition;
+        
         // IMMEDIATELY hide elements off-screen (before first frame renders!)
         HideUIElements();
     }
     
     void Start()
     {
+        // Set initial panel visibility states
+        if (mainMenuCanvasGroup != null)
+        {
+            mainMenuCanvasGroup.alpha = 1f;
+            mainMenuCanvasGroup.interactable = true;
+            mainMenuCanvasGroup.blocksRaycasts = true;
+        }
+        
+        if (trackSelectionCanvasGroup != null)
+        {
+            trackSelectionCanvasGroup.alpha = 0f;
+            trackSelectionCanvasGroup.interactable = false;
+            trackSelectionCanvasGroup.blocksRaycasts = false;
+        }
+        
+        if (creditsCanvasGroup != null)
+        {
+            creditsCanvasGroup.alpha = 0f;
+            creditsCanvasGroup.interactable = false;
+            creditsCanvasGroup.blocksRaycasts = false;
+        }
+        
         // Start animations after first frame
         StartCoroutine(AnimateMenuEntrance());
     }
@@ -91,6 +165,13 @@ public class MainMenuAnimations : MonoBehaviour
         {
             float wiggle = Mathf.Sin(Time.time * trackTitleWiggleSpeed) * trackTitleWiggleAmount;
             trackPanelTitle.localRotation = Quaternion.Euler(0f, 0f, wiggle);
+        }
+        
+        // Continuous pulse for credits title
+        if (isCreditsTitlePulsing && creditsPanelTitle != null)
+        {
+            float pulse = 1f + Mathf.Sin(Time.time * creditsTitlePulseSpeed) * (creditsTitlePulseAmount - 1f);
+            creditsPanelTitle.localScale = Vector3.one * pulse;
         }
     }
     
@@ -104,10 +185,14 @@ public class MainMenuAnimations : MonoBehaviour
         
         // Hide main menu buttons below and make transparent
         HideButton(playButton, playOriginalPos);
+        HideButton(creditsButton, creditsOriginalPos);
         HideButton(exitButton, exitOriginalPos);
         
         // Hide track panel elements
         HideTrackPanelElements();
+        
+        // Hide credits panel elements
+        HideCreditsPanelElements();
     }
     
     void HideTrackPanelElements()
@@ -129,6 +214,26 @@ public class MainMenuAnimations : MonoBehaviour
         HideButton(trackGridContainer, trackGridOriginalPos, trackGridSlideDistance);
     }
     
+    void HideCreditsPanelElements()
+    {
+        // Hide back button to the left
+        if (creditsBackButton != null)
+        {
+            creditsBackButton.anchoredPosition = creditsBackOriginalPos + new Vector2(-creditsBackSlideDistance, 0f);
+        }
+        
+        // Hide credits title above
+        if (creditsPanelTitle != null)
+        {
+            creditsPanelTitle.anchoredPosition = creditsTitleOriginalPos + new Vector2(0f, creditsTitleDropDistance);
+            creditsPanelTitle.localScale = Vector3.one;
+        }
+        
+        // Hide name cards below
+        HideButton(creditsName1, creditsName1OriginalPos, creditsNameSlideDistance);
+        HideButton(creditsName2, creditsName2OriginalPos, creditsNameSlideDistance);
+    }
+    
     void HideButton(RectTransform button, Vector2 originalPos, float slideDistance = -1f)
     {
         if (button == null) return;
@@ -148,24 +253,29 @@ public class MainMenuAnimations : MonoBehaviour
         canvasGroup.alpha = 0f;
     }
     
+    // ========== ENTRANCE ANIMATIONS ==========
+    
     IEnumerator AnimateMenuEntrance()
     {
-        // Wait initial delay
         yield return new WaitForSeconds(titleDelay);
         
-        // Animate title
         if (titleText != null)
         {
             StartCoroutine(AnimateTitle());
         }
         
-        // Wait before buttons
         yield return new WaitForSeconds(buttonStartDelay);
         
-        // Animate buttons with stagger
         if (playButton != null)
         {
             StartCoroutine(AnimateButton(playButton, playOriginalPos, 0f));
+        }
+        
+        yield return new WaitForSeconds(buttonStagger);
+        
+        if (creditsButton != null)
+        {
+            StartCoroutine(AnimateButton(creditsButton, creditsOriginalPos, 0f));
         }
         
         yield return new WaitForSeconds(buttonStagger);
@@ -176,59 +286,350 @@ public class MainMenuAnimations : MonoBehaviour
         }
     }
     
+    IEnumerator AnimateTrackPanelEntrance()
+    {
+        if (trackBackButton != null)
+        {
+            yield return new WaitForSeconds(trackBackDelay);
+            StartCoroutine(AnimateTrackBackButton());
+        }
+        
+        if (trackPanelTitle != null)
+        {
+            yield return new WaitForSeconds(trackTitleDelay);
+            StartCoroutine(AnimateTrackTitle());
+        }
+        
+        yield return new WaitForSeconds(trackGridStartDelay);
+        
+        if (trackGridContainer != null)
+        {
+            StartCoroutine(AnimateButton(trackGridContainer, trackGridOriginalPos, 0f, trackGridDuration));
+        }
+    }
+    
+    IEnumerator AnimateCreditsPanelEntrance()
+    {
+        if (creditsBackButton != null)
+        {
+            yield return new WaitForSeconds(creditsBackDelay);
+            StartCoroutine(AnimateCreditsBackButton());
+        }
+        
+        if (creditsPanelTitle != null)
+        {
+            yield return new WaitForSeconds(creditsTitleDelay);
+            StartCoroutine(AnimateCreditsTitle());
+        }
+        
+        yield return new WaitForSeconds(creditsNameStartDelay);
+        
+        if (creditsName1 != null)
+        {
+            StartCoroutine(AnimateButton(creditsName1, creditsName1OriginalPos, 0f, creditsNameDuration));
+        }
+        
+        yield return new WaitForSeconds(creditsNameStagger);
+        
+        if (creditsName2 != null)
+        {
+            StartCoroutine(AnimateButton(creditsName2, creditsName2OriginalPos, 0f, creditsNameDuration));
+        }
+    }
+    
+    // ========== EXIT ANIMATIONS ==========
+    
+    IEnumerator ExitMainMenu()
+    {
+        // Exit in reverse order: buttons first, then title
+        if (exitButton != null)
+        {
+            StartCoroutine(ExitButton(exitButton, exitOriginalPos, 0f));
+        }
+        
+        yield return new WaitForSeconds(exitStagger);
+        
+        if (creditsButton != null)
+        {
+            StartCoroutine(ExitButton(creditsButton, creditsOriginalPos, 0f));
+        }
+        
+        yield return new WaitForSeconds(exitStagger);
+        
+        if (playButton != null)
+        {
+            StartCoroutine(ExitButton(playButton, playOriginalPos, 0f));
+        }
+        
+        yield return new WaitForSeconds(exitStagger);
+        
+        if (titleText != null)
+        {
+            StartCoroutine(ExitTitle());
+        }
+        
+        // Wait for all animations to complete
+        yield return new WaitForSeconds(exitDuration);
+    }
+    
+    IEnumerator ExitTrackPanel()
+    {
+        // Stop wiggle animation
+        isTitleWiggling = false;
+        if (trackPanelTitle != null)
+        {
+            trackPanelTitle.localRotation = Quaternion.identity;
+        }
+        
+        // Exit in reverse: grid, title, back button
+        if (trackGridContainer != null)
+        {
+            StartCoroutine(ExitButton(trackGridContainer, trackGridOriginalPos, 0f, trackGridSlideDistance));
+        }
+        
+        yield return new WaitForSeconds(exitStagger);
+        
+        if (trackPanelTitle != null)
+        {
+            StartCoroutine(ExitTrackTitle());
+        }
+        
+        yield return new WaitForSeconds(exitStagger);
+        
+        if (trackBackButton != null)
+        {
+            StartCoroutine(ExitTrackBackButton());
+        }
+        
+        yield return new WaitForSeconds(exitDuration);
+    }
+    
+    IEnumerator ExitCreditsPanel()
+    {
+        // Stop pulse animation
+        isCreditsTitlePulsing = false;
+        if (creditsPanelTitle != null)
+        {
+            creditsPanelTitle.localScale = Vector3.one;
+        }
+        
+        // Exit in reverse: names, title, back button
+        if (creditsName2 != null)
+        {
+            StartCoroutine(ExitButton(creditsName2, creditsName2OriginalPos, 0f, creditsNameSlideDistance));
+        }
+        
+        yield return new WaitForSeconds(exitStagger);
+        
+        if (creditsName1 != null)
+        {
+            StartCoroutine(ExitButton(creditsName1, creditsName1OriginalPos, 0f, creditsNameSlideDistance));
+        }
+        
+        yield return new WaitForSeconds(exitStagger);
+        
+        if (creditsPanelTitle != null)
+        {
+            StartCoroutine(ExitCreditsTitle());
+        }
+        
+        yield return new WaitForSeconds(exitStagger);
+        
+        if (creditsBackButton != null)
+        {
+            StartCoroutine(ExitCreditsBackButton());
+        }
+        
+        yield return new WaitForSeconds(exitDuration);
+    }
+    
+    // ========== PUBLIC TRANSITION METHODS ==========
+    
+    public void AnimateTrackPanel()
+    {
+        StopAllCoroutines();
+        isTitleWiggling = false;
+        isCreditsTitlePulsing = false;
+        StartCoroutine(TransitionToTrackPanel());
+    }
+    
+    public void AnimateCreditsPanel()
+    {
+        StopAllCoroutines();
+        isTitleWiggling = false;
+        isCreditsTitlePulsing = false;
+        StartCoroutine(TransitionToCreditsPanel());
+    }
+    
+    public void AnimateMainMenu()
+    {
+        StopAllCoroutines();
+        isTitleWiggling = false;
+        isCreditsTitlePulsing = false;
+        StartCoroutine(TransitionToMainMenu());
+    }
+    
+    // ========== TRANSITION SEQUENCES ==========
+    
+    IEnumerator TransitionToTrackPanel()
+    {
+        // Exit main menu first
+        yield return StartCoroutine(ExitMainMenu());
+        
+        // Make sure track panel is visible (but elements are still off-screen)
+        if (trackSelectionCanvasGroup != null)
+        {
+            trackSelectionCanvasGroup.alpha = 1f;
+            trackSelectionCanvasGroup.interactable = true;
+            trackSelectionCanvasGroup.blocksRaycasts = true;
+        }
+        
+        // Hide main menu panel
+        if (mainMenuCanvasGroup != null)
+        {
+            mainMenuCanvasGroup.alpha = 0f;
+            mainMenuCanvasGroup.interactable = false;
+            mainMenuCanvasGroup.blocksRaycasts = false;
+        }
+        
+        // Then enter track panel
+        HideTrackPanelElements();
+        yield return StartCoroutine(AnimateTrackPanelEntrance());
+        
+        // Update current panel
+        currentPanel = ActivePanel.TrackSelection;
+    }
+    
+    IEnumerator TransitionToCreditsPanel()
+    {
+        // Exit main menu first
+        yield return StartCoroutine(ExitMainMenu());
+        
+        // Make sure credits panel is visible (but elements are still off-screen)
+        if (creditsCanvasGroup != null)
+        {
+            creditsCanvasGroup.alpha = 1f;
+            creditsCanvasGroup.interactable = true;
+            creditsCanvasGroup.blocksRaycasts = true;
+        }
+        
+        // Hide main menu panel
+        if (mainMenuCanvasGroup != null)
+        {
+            mainMenuCanvasGroup.alpha = 0f;
+            mainMenuCanvasGroup.interactable = false;
+            mainMenuCanvasGroup.blocksRaycasts = false;
+        }
+        
+        // Then enter credits panel
+        HideCreditsPanelElements();
+        yield return StartCoroutine(AnimateCreditsPanelEntrance());
+        
+        // Update current panel
+        currentPanel = ActivePanel.Credits;
+    }
+    
+    IEnumerator TransitionToMainMenu()
+    {
+        // Exit the current panel based on tracking
+        if (currentPanel == ActivePanel.TrackSelection)
+        {
+            yield return StartCoroutine(ExitTrackPanel());
+            
+            // Hide track panel
+            if (trackSelectionCanvasGroup != null)
+            {
+                trackSelectionCanvasGroup.alpha = 0f;
+                trackSelectionCanvasGroup.interactable = false;
+                trackSelectionCanvasGroup.blocksRaycasts = false;
+            }
+        }
+        else if (currentPanel == ActivePanel.Credits)
+        {
+            yield return StartCoroutine(ExitCreditsPanel());
+            
+            // Hide credits panel
+            if (creditsCanvasGroup != null)
+            {
+                creditsCanvasGroup.alpha = 0f;
+                creditsCanvasGroup.interactable = false;
+                creditsCanvasGroup.blocksRaycasts = false;
+            }
+        }
+        
+        // Make sure main menu panel is visible (but elements are still off-screen)
+        if (mainMenuCanvasGroup != null)
+        {
+            mainMenuCanvasGroup.alpha = 1f;
+            mainMenuCanvasGroup.interactable = true;
+            mainMenuCanvasGroup.blocksRaycasts = true;
+        }
+        
+        // Then enter main menu
+        HideUIElements();
+        yield return StartCoroutine(AnimateMenuEntrance());
+        
+        // Update current panel
+        currentPanel = ActivePanel.MainMenu;
+    }
+    
+    // ========== INDIVIDUAL ANIMATION COROUTINES ==========
+    
     IEnumerator AnimateTitle()
     {
-        // Start position (off-screen left)
         Vector2 startPos = titleOriginalPos + new Vector2(-titleSlideDistance, 0f);
-        
-        // Overshoot position (slightly past target)
         Vector2 overshootPos = titleOriginalPos + new Vector2(titleOvershoot, 0f);
-        
         titleText.anchoredPosition = startPos;
         
         float elapsed = 0f;
-        
-        // Phase 1: Slide in with overshoot (70% of duration)
         float phase1Duration = titleDuration * 0.7f;
+        
         while (elapsed < phase1Duration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / phase1Duration;
-            float curvedT = titleEase.Evaluate(t);
-            
-            titleText.anchoredPosition = Vector2.Lerp(startPos, overshootPos, curvedT);
+            titleText.anchoredPosition = Vector2.Lerp(startPos, overshootPos, titleEase.Evaluate(t));
             yield return null;
         }
         
-        // Phase 2: Bounce back to final position (30% of duration)
-        float phase2Duration = titleDuration * 0.3f;
         elapsed = 0f;
+        float phase2Duration = titleDuration * 0.3f;
         
         while (elapsed < phase2Duration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / phase2Duration;
-            float curvedT = Mathf.Sin(t * Mathf.PI * 0.5f); // Ease out
-            
-            titleText.anchoredPosition = Vector2.Lerp(overshootPos, titleOriginalPos, curvedT);
+            titleText.anchoredPosition = Vector2.Lerp(overshootPos, titleOriginalPos, Mathf.Sin(t * Mathf.PI * 0.5f));
             yield return null;
         }
         
-        // Ensure final position is exact
         titleText.anchoredPosition = titleOriginalPos;
+    }
+    
+    IEnumerator ExitTitle()
+    {
+        Vector2 startPos = titleOriginalPos;
+        Vector2 endPos = titleOriginalPos + new Vector2(-titleSlideDistance, 0f);
+        
+        float elapsed = 0f;
+        
+        while (elapsed < exitDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / exitDuration;
+            titleText.anchoredPosition = Vector2.Lerp(startPos, endPos, exitEase.Evaluate(t));
+            yield return null;
+        }
+        
+        titleText.anchoredPosition = endPos;
     }
     
     IEnumerator AnimateButton(RectTransform button, Vector2 targetPos, float delay, float duration = -1f)
     {
         yield return new WaitForSeconds(delay);
         
-        // Use custom duration or default
         float animDuration = duration > 0 ? duration : buttonDuration;
-        
-        // Get starting position (already set in HideUIElements)
         Vector2 startPos = button.anchoredPosition;
-        
-        // Get canvas group (already added in HideUIElements)
         CanvasGroup canvasGroup = button.GetComponent<CanvasGroup>();
         
         float elapsed = 0f;
@@ -239,135 +640,214 @@ public class MainMenuAnimations : MonoBehaviour
             float t = elapsed / animDuration;
             float curvedT = buttonEase.Evaluate(t);
             
-            // Slide up
             button.anchoredPosition = Vector2.Lerp(startPos, targetPos, curvedT);
-            
-            // Fade in
             canvasGroup.alpha = curvedT;
             
             yield return null;
         }
         
-        // Ensure final position and alpha
         button.anchoredPosition = targetPos;
         canvasGroup.alpha = 1f;
     }
     
-    // Call this if you want to replay animations
-    public void ReplayAnimations()
+    IEnumerator ExitButton(RectTransform button, Vector2 originalPos, float delay, float slideDistance = -1f)
     {
-        StopAllCoroutines();
-        StartCoroutine(AnimateMenuEntrance());
-    }
-    
-    // Call this when track selection panel is shown
-    public void AnimateTrackPanel()
-    {
-        StopAllCoroutines();
-        isTitleWiggling = false;
-        HideTrackPanelElements();
-        StartCoroutine(AnimateTrackPanelEntrance());
-    }
-    
-    // Call this when returning to main menu
-    public void AnimateMainMenu()
-    {
-        StopAllCoroutines();
-        isTitleWiggling = false;
-        HideUIElements();
-        StartCoroutine(AnimateMenuEntrance());
-    }
-    
-    IEnumerator AnimateTrackPanelEntrance()
-    {
-        // Animate back button from left
-        if (trackBackButton != null)
+        yield return new WaitForSeconds(delay);
+        
+        float distance = slideDistance > 0 ? slideDistance : buttonSlideDistance;
+        Vector2 startPos = button.anchoredPosition;
+        Vector2 endPos = originalPos + new Vector2(0f, -distance);
+        CanvasGroup canvasGroup = button.GetComponent<CanvasGroup>();
+        
+        float elapsed = 0f;
+        
+        while (elapsed < exitDuration)
         {
-            yield return new WaitForSeconds(trackBackDelay);
-            StartCoroutine(AnimateTrackBackButton());
+            elapsed += Time.deltaTime;
+            float t = elapsed / exitDuration;
+            float curvedT = exitEase.Evaluate(t);
+            
+            button.anchoredPosition = Vector2.Lerp(startPos, endPos, curvedT);
+            canvasGroup.alpha = 1f - curvedT;
+            
+            yield return null;
         }
         
-        // Animate title dropping from top
-        if (trackPanelTitle != null)
-        {
-            yield return new WaitForSeconds(trackTitleDelay);
-            StartCoroutine(AnimateTrackTitle());
-        }
-        
-        // Animate entire grid container popping up from bottom
-        yield return new WaitForSeconds(trackGridStartDelay);
-        
-        if (trackGridContainer != null)
-        {
-            StartCoroutine(AnimateButton(trackGridContainer, trackGridOriginalPos, 0f, trackGridDuration));
-        }
+        button.anchoredPosition = endPos;
+        canvasGroup.alpha = 0f;
     }
     
     IEnumerator AnimateTrackBackButton()
     {
-        // Start position (off-screen left)
         Vector2 startPos = trackBackOriginalPos + new Vector2(-trackBackSlideDistance, 0f);
-        
-        // Overshoot position
         Vector2 overshootPos = trackBackOriginalPos + new Vector2(trackBackOvershoot, 0f);
-        
         trackBackButton.anchoredPosition = startPos;
         
         float elapsed = 0f;
-        
-        // Phase 1: Slide in with overshoot (70%)
         float phase1Duration = trackBackDuration * 0.7f;
+        
         while (elapsed < phase1Duration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / phase1Duration;
-            float curvedT = titleEase.Evaluate(t);
-            
-            trackBackButton.anchoredPosition = Vector2.Lerp(startPos, overshootPos, curvedT);
+            trackBackButton.anchoredPosition = Vector2.Lerp(startPos, overshootPos, titleEase.Evaluate(t));
             yield return null;
         }
         
-        // Phase 2: Bounce back to final (30%)
-        float phase2Duration = trackBackDuration * 0.3f;
         elapsed = 0f;
+        float phase2Duration = trackBackDuration * 0.3f;
         
         while (elapsed < phase2Duration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / phase2Duration;
-            float curvedT = Mathf.Sin(t * Mathf.PI * 0.5f);
-            
-            trackBackButton.anchoredPosition = Vector2.Lerp(overshootPos, trackBackOriginalPos, curvedT);
+            trackBackButton.anchoredPosition = Vector2.Lerp(overshootPos, trackBackOriginalPos, Mathf.Sin(t * Mathf.PI * 0.5f));
             yield return null;
         }
         
         trackBackButton.anchoredPosition = trackBackOriginalPos;
     }
     
+    IEnumerator ExitTrackBackButton()
+    {
+        Vector2 startPos = trackBackOriginalPos;
+        Vector2 endPos = trackBackOriginalPos + new Vector2(-trackBackSlideDistance, 0f);
+        
+        float elapsed = 0f;
+        
+        while (elapsed < exitDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / exitDuration;
+            trackBackButton.anchoredPosition = Vector2.Lerp(startPos, endPos, exitEase.Evaluate(t));
+            yield return null;
+        }
+        
+        trackBackButton.anchoredPosition = endPos;
+    }
+    
     IEnumerator AnimateTrackTitle()
     {
-        // Start position (above screen)
         Vector2 startPos = trackTitleOriginalPos + new Vector2(0f, trackTitleDropDistance);
-        
         trackPanelTitle.anchoredPosition = startPos;
         trackPanelTitle.localRotation = Quaternion.identity;
         
         float elapsed = 0f;
         
-        // Drop down
         while (elapsed < trackTitleDuration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / trackTitleDuration;
-            float curvedT = titleEase.Evaluate(t);
-            
-            trackPanelTitle.anchoredPosition = Vector2.Lerp(startPos, trackTitleOriginalPos, curvedT);
+            trackPanelTitle.anchoredPosition = Vector2.Lerp(startPos, trackTitleOriginalPos, titleEase.Evaluate(t));
             yield return null;
         }
         
         trackPanelTitle.anchoredPosition = trackTitleOriginalPos;
-        
-        // Start continuous wiggle
         isTitleWiggling = true;
+    }
+    
+    IEnumerator ExitTrackTitle()
+    {
+        Vector2 startPos = trackTitleOriginalPos;
+        Vector2 endPos = trackTitleOriginalPos + new Vector2(0f, trackTitleDropDistance);
+        
+        float elapsed = 0f;
+        
+        while (elapsed < exitDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / exitDuration;
+            trackPanelTitle.anchoredPosition = Vector2.Lerp(startPos, endPos, exitEase.Evaluate(t));
+            yield return null;
+        }
+        
+        trackPanelTitle.anchoredPosition = endPos;
+    }
+    
+    IEnumerator AnimateCreditsBackButton()
+    {
+        Vector2 startPos = creditsBackOriginalPos + new Vector2(-creditsBackSlideDistance, 0f);
+        Vector2 overshootPos = creditsBackOriginalPos + new Vector2(creditsBackOvershoot, 0f);
+        creditsBackButton.anchoredPosition = startPos;
+        
+        float elapsed = 0f;
+        float phase1Duration = creditsBackDuration * 0.7f;
+        
+        while (elapsed < phase1Duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / phase1Duration;
+            creditsBackButton.anchoredPosition = Vector2.Lerp(startPos, overshootPos, titleEase.Evaluate(t));
+            yield return null;
+        }
+        
+        elapsed = 0f;
+        float phase2Duration = creditsBackDuration * 0.3f;
+        
+        while (elapsed < phase2Duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / phase2Duration;
+            creditsBackButton.anchoredPosition = Vector2.Lerp(overshootPos, creditsBackOriginalPos, Mathf.Sin(t * Mathf.PI * 0.5f));
+            yield return null;
+        }
+        
+        creditsBackButton.anchoredPosition = creditsBackOriginalPos;
+    }
+    
+    IEnumerator ExitCreditsBackButton()
+    {
+        Vector2 startPos = creditsBackOriginalPos;
+        Vector2 endPos = creditsBackOriginalPos + new Vector2(-creditsBackSlideDistance, 0f);
+        
+        float elapsed = 0f;
+        
+        while (elapsed < exitDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / exitDuration;
+            creditsBackButton.anchoredPosition = Vector2.Lerp(startPos, endPos, exitEase.Evaluate(t));
+            yield return null;
+        }
+        
+        creditsBackButton.anchoredPosition = endPos;
+    }
+    
+    IEnumerator AnimateCreditsTitle()
+    {
+        Vector2 startPos = creditsTitleOriginalPos + new Vector2(0f, creditsTitleDropDistance);
+        creditsPanelTitle.anchoredPosition = startPos;
+        creditsPanelTitle.localScale = Vector3.one;
+        
+        float elapsed = 0f;
+        
+        while (elapsed < creditsTitleDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / creditsTitleDuration;
+            creditsPanelTitle.anchoredPosition = Vector2.Lerp(startPos, creditsTitleOriginalPos, titleEase.Evaluate(t));
+            yield return null;
+        }
+        
+        creditsPanelTitle.anchoredPosition = creditsTitleOriginalPos;
+        isCreditsTitlePulsing = true;
+    }
+    
+    IEnumerator ExitCreditsTitle()
+    {
+        Vector2 startPos = creditsTitleOriginalPos;
+        Vector2 endPos = creditsTitleOriginalPos + new Vector2(0f, creditsTitleDropDistance);
+        
+        float elapsed = 0f;
+        
+        while (elapsed < exitDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / exitDuration;
+            creditsPanelTitle.anchoredPosition = Vector2.Lerp(startPos, endPos, exitEase.Evaluate(t));
+            yield return null;
+        }
+        
+        creditsPanelTitle.anchoredPosition = endPos;
     }
 }

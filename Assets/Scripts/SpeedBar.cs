@@ -5,85 +5,190 @@ using TMPro;
 public class SpeedBar : MonoBehaviour
 {
     [Header("References")]
-    public Image fillBar;
-    public RectTransform needle; // Σύρε εδώ τη βελόνα (αν έχεις)
-    public TextMeshProUGUI speedText;
-    public Rigidbody vehicleRigidbody;
-
+    [SerializeField] private CustomVehicleController vehicleController;
+    [SerializeField] private Image speedBarFill;  // The UI Image that will fill
+    [SerializeField] private TextMeshProUGUI speedText;  // Optional speed text display
+    
     [Header("Speed Settings")]
-    public float maxSpeed = 160f;        // Τελική ταχύτητα σε KM/H
-    public float smoothing = 8f;         // Πόσο ομαλά κουνιέται η μπάρα
-
+    [Tooltip("Will automatically use vehicle's max speed if not set")]
+    public float maxDisplaySpeed = 0f;  // Leave at 0 to use vehicle's max speed
+    
     [Header("Visual Settings")]
-    public Gradient speedGradient;       // Χρώματα από πράσινο σε κόκκινο
-    public float minNeedleAngle = 180f;  // Γωνία βελόνας στο 0
-    public float maxNeedleAngle = -90f;  // Γωνία βελόνας στο τέρμα
-
-    [Header("Shake Effect")]
-    public bool enableShake = true;
-    public float shakeIntensity = 1.2f;
-
-    private float currentSpeedKMH;
-    private Vector3 originalTextPos;
+    public float fillSmoothing = 8f;  // How quickly the bar catches up to actual speed
+    
+    [Header("Color Gradient")]
+    [Tooltip("Color at 0% speed")]
+    public Color lowSpeedColor = new Color(0.2f, 0.8f, 0.2f);  // Green
+    
+    [Tooltip("Color at 50% speed")]
+    public Color midSpeedColor = new Color(0.8f, 0.8f, 0.2f);  // Yellow
+    
+    [Tooltip("Color at 100% speed")]
+    public Color highSpeedColor = new Color(0.8f, 0.2f, 0.2f); // Red
+    
+    [Tooltip("Color during boost")]
+    public Color boostColor = new Color(0.3f, 0.6f, 1f);       // Bright blue
+    
+    [Header("Boost Visual")]
+    public bool pulseOnBoost = true;
+    public float boostPulseSpeed = 10f;
+    public float boostPulseAmount = 0.15f;
+    
+    [Header("Speed Text (Optional)")]
+    [Tooltip("Show speed as text (e.g., '125 km/h')")]
+    public bool showSpeedText = true;
+    [Tooltip("Number format: 0 = no decimals, 0.0 = one decimal")]
+    public string speedFormat = "0";  // "0" for integers, "0.0" for one decimal
+    public string speedUnit = " km/h";  // Text after the number
+    
+    private Rigidbody rb;
+    private float currentFillAmount = 0f;
+    private float actualMaxSpeed;
 
     void Start()
     {
-        if (speedText != null) originalTextPos = speedText.rectTransform.localPosition;
-
-        // Αν δεν έχεις βάλει Rigidbody, προσπαθεί να το βρει στο Taxi
-        if (vehicleRigidbody == null)
+        // Get Rigidbody from vehicle
+        if (vehicleController != null)
         {
-            vehicleRigidbody = GameObject.FindWithTag("Player")?.GetComponent<Rigidbody>();
+            rb = vehicleController.GetComponent<Rigidbody>();
+            
+            // Use vehicle's max speed if we didn't set a custom one
+            if (maxDisplaySpeed <= 0f)
+            {
+                actualMaxSpeed = vehicleController.maxSpeed;
+                
+                // Account for boost if vehicle can boost
+                actualMaxSpeed *= vehicleController.boostMaxSpeedMultiplier;
+            }
+            else
+            {
+                actualMaxSpeed = maxDisplaySpeed;
+            }
+        }
+        else
+        {
+            // Fallback: try to find vehicle with Player tag
+            GameObject player = GameObject.FindWithTag("Player");
+            if (player != null)
+            {
+                vehicleController = player.GetComponent<CustomVehicleController>();
+                if (vehicleController != null)
+                {
+                    rb = vehicleController.GetComponent<Rigidbody>();
+                    actualMaxSpeed = vehicleController.maxSpeed * vehicleController.boostMaxSpeedMultiplier;
+                }
+            }
+        }
+        
+        // Initialize the bar
+        if (speedBarFill != null)
+        {
+            speedBarFill.fillAmount = 0f;
+            speedBarFill.color = lowSpeedColor;
+            
+            // Ensure the Image is set to Filled type
+            if (speedBarFill.type != Image.Type.Filled)
+            {
+                Debug.LogWarning("[SpeedBar] Speed bar Image should be set to 'Filled' type for proper fill effect!");
+            }
+        }
+        else
+        {
+            Debug.LogError("[SpeedBar] Speed Bar Fill Image is not assigned!");
         }
     }
 
     void Update()
     {
-        if (vehicleRigidbody == null) return;
-
-        // Υπολογισμός ταχύτητας σε KM/H
-        float realSpeedKMH = vehicleRigidbody.linearVelocity.magnitude * 3.6f;
-
-        // Smoothing: Κάνει την μπάρα να "γλιστράει" ομαλά αντί να πηδάει
-        currentSpeedKMH = Mathf.Lerp(currentSpeedKMH, realSpeedKMH, Time.deltaTime * smoothing);
-
-        float speedRatio = Mathf.Clamp01(currentSpeedKMH / maxSpeed);
-
-        UpdateSpeedUI(speedRatio);
+        if (rb == null || speedBarFill == null) return;
+        
+        // Get current speed
+        float currentSpeed = rb.linearVelocity.magnitude;
+        
+        // Calculate target fill (0 to 1)
+        float targetFill = Mathf.Clamp01(currentSpeed / actualMaxSpeed);
+        
+        // Smooth the fill amount
+        currentFillAmount = Mathf.Lerp(currentFillAmount, targetFill, Time.deltaTime * fillSmoothing);
+        
+        // Apply boost pulse if boosting
+        float finalFillAmount = currentFillAmount;
+        if (pulseOnBoost && vehicleController != null && vehicleController.IsBoosting())
+        {
+            float pulse = Mathf.Sin(Time.time * boostPulseSpeed) * boostPulseAmount;
+            finalFillAmount = Mathf.Clamp01(currentFillAmount + pulse);
+        }
+        
+        speedBarFill.fillAmount = finalFillAmount;
+        
+        // Update color
+        UpdateBarColor();
+        
+        // Update speed text
+        UpdateSpeedText();
     }
 
-    void UpdateSpeedUI(float ratio)
+    void UpdateBarColor()
     {
-        // 1. Γέμισμα μπάρας
-        if (fillBar != null)
+        // Check if boosting first - overrides normal color
+        if (vehicleController != null && vehicleController.IsBoosting())
         {
-            fillBar.fillAmount = ratio;
-            if (speedGradient != null)
-                fillBar.color = speedGradient.Evaluate(ratio);
+            speedBarFill.color = boostColor;
+            return;
         }
-
-        // 2. Κίνηση βελόνας (προαιρετικό)
-        if (needle != null)
+        
+        // Normal color gradient based on speed percentage
+        Color targetColor;
+        
+        if (currentFillAmount < 0.5f)
         {
-            float targetAngle = Mathf.Lerp(minNeedleAngle, maxNeedleAngle, ratio);
-            needle.rotation = Quaternion.Euler(0, 0, targetAngle);
+            // Transition from low to mid (0% to 50%)
+            float t = currentFillAmount / 0.5f;
+            targetColor = Color.Lerp(lowSpeedColor, midSpeedColor, t);
         }
-
-        // 3. Κείμενο και Shake (Τρέμουλο)
-        if (speedText != null)
+        else
         {
-            speedText.text = Mathf.RoundToInt(currentSpeedKMH).ToString();
-
-            // Το τρέμουλο ενεργοποιείται μετά το 80% της τελικής ταχύτητας
-            if (enableShake && ratio > 0.8f)
+            // Transition from mid to high (50% to 100%)
+            float t = (currentFillAmount - 0.5f) / 0.5f;
+            targetColor = Color.Lerp(midSpeedColor, highSpeedColor, t);
+        }
+        
+        // Smooth color transition
+        speedBarFill.color = Color.Lerp(speedBarFill.color, targetColor, Time.deltaTime * fillSmoothing);
+    }
+    
+    void UpdateSpeedText()
+    {
+        if (!showSpeedText || speedText == null) return;
+        
+        float speedKMH = GetCurrentSpeedKMH();
+        speedText.text = speedKMH.ToString(speedFormat) + speedUnit;
+    }
+    
+    // Optional: Manually set the vehicle controller if not set in inspector
+    public void SetVehicleController(CustomVehicleController controller)
+    {
+        vehicleController = controller;
+        if (controller != null)
+        {
+            rb = controller.GetComponent<Rigidbody>();
+            if (maxDisplaySpeed <= 0f)
             {
-                float shake = (ratio - 0.8f) * shakeIntensity * 12f;
-                speedText.rectTransform.localPosition = originalTextPos + (Vector3)Random.insideUnitCircle * shake;
-            }
-            else
-            {
-                speedText.rectTransform.localPosition = originalTextPos;
+                actualMaxSpeed = controller.maxSpeed * controller.boostMaxSpeedMultiplier;
             }
         }
+    }
+    
+    // Helper method to get current speed in KM/H (if you want to display it elsewhere)
+    public float GetCurrentSpeedKMH()
+    {
+        if (rb == null) return 0f;
+        return rb.linearVelocity.magnitude * 3.6f;
+    }
+    
+    // Helper method to get current fill percentage (0-1)
+    public float GetCurrentFillPercentage()
+    {
+        return currentFillAmount;
     }
 }

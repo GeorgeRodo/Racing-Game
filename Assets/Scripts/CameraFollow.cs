@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 public class CameraFollow : MonoBehaviour
 {
@@ -32,12 +34,15 @@ public class CameraFollow : MonoBehaviour
     public float maxSpeedFOV = 75f;
     public float normalFOV = 60f;
     
-    [Header("Boost Visual Effects")]
-    public UnityEngine.Rendering.Volume postProcessVolume;  // URP Volume
-    public float boostBloomIntensity = 8f;      // Extra bloom during boost
-    public float boostSaturation = 10f;          // Extra color saturation
-    public float boostVignetteIntensity = 0.2f;  // Extra vignette darkness
-    public float boostEffectSpeed = 5f;          // How fast effects transition
+    [Header("Boost Post-Processing")]
+    [Tooltip("Assign your Global Volume here")]
+    public Volume postProcessVolume;
+    public float boostMotionBlur = 0.5f;        // Motion blur intensity during boost
+    public float boostLensDistortion = -0.3f;   // Lens distortion during boost (negative = barrel)
+    public float boostEffectSpeed = 5f;         // How fast effects transition
+    
+    [Header("Debug")]
+    public bool showDebugInfo = false;
     
     private Camera cam;
     private Rigidbody targetRb;
@@ -58,16 +63,14 @@ public class CameraFollow : MonoBehaviour
     private Vector3 frozenPosition;
     private Quaternion frozenRotation;
     
-    // Post-processing effect references
-    private UnityEngine.Rendering.Universal.Bloom bloomEffect;
-    private UnityEngine.Rendering.Universal.ColorAdjustments colorAdjustments;
-    private UnityEngine.Rendering.Universal.Vignette vignetteEffect;
+    // Post-processing effect references (only for boost effects)
+    private MotionBlur motionBlurEffect;
+    private LensDistortion lensDistortionEffect;
     
-    // Base values for post-processing (to return to after boost)
-    private float baseBloomIntensity = 0f;
-    private float baseSaturation = 0f;
-    private float baseVignetteIntensity = 0f;
-    private bool hasStoredBaseValues = false;
+    // Track current boost effect values
+    private float currentMotionBlurIntensity = 0f;
+    private float currentLensDistortion = 0f;
+    private bool effectsInitialized = false;
 
     void Start()
     {
@@ -80,12 +83,81 @@ public class CameraFollow : MonoBehaviour
         currentOffset = offset;
         currentDistance = offset.magnitude;
         
-        // Get post-processing effects if volume is assigned
-        if (postProcessVolume != null && postProcessVolume.profile != null)
+        // Initialize boost-specific post-processing effects
+        InitializeBoostEffects();
+    }
+    
+    void InitializeBoostEffects()
+    {
+        // If no volume assigned, try to find one
+        if (postProcessVolume == null)
         {
-            postProcessVolume.profile.TryGet(out bloomEffect);
-            postProcessVolume.profile.TryGet(out colorAdjustments);
-            postProcessVolume.profile.TryGet(out vignetteEffect);
+            postProcessVolume = FindFirstObjectByType<Volume>();
+            
+            if (postProcessVolume != null && showDebugInfo)
+            {
+                Debug.Log($"<color=cyan>[Camera]</color> Auto-found Volume: {postProcessVolume.name}");
+            }
+        }
+        
+        // If we still don't have a volume, we're done
+        if (postProcessVolume == null)
+        {
+            if (showDebugInfo)
+            {
+                Debug.LogWarning("<color=yellow>[Camera]</color> No Post Processing Volume found! Boost visual effects disabled.");
+            }
+            return;
+        }
+        
+        // Make sure volume has a profile
+        if (postProcessVolume.profile == null)
+        {
+            Debug.LogError("<color=red>[Camera]</color> Volume has no profile assigned!");
+            return;
+        }
+        
+        // Try to get boost-specific effects from the volume profile
+        bool hasMotionBlur = postProcessVolume.profile.TryGet(out motionBlurEffect);
+        bool hasLensDistortion = postProcessVolume.profile.TryGet(out lensDistortionEffect);
+        
+        // Initialize Motion Blur (if it exists)
+        if (hasMotionBlur)
+        {
+            // We'll control the intensity dynamically
+            motionBlurEffect.intensity.overrideState = true;
+            currentMotionBlurIntensity = 0f; // Start at 0, only activate during boost
+            motionBlurEffect.intensity.value = 0f;
+            
+            if (showDebugInfo) 
+                Debug.Log("<color=green>[Camera]</color> Motion Blur ready for boost");
+        }
+        else if (showDebugInfo)
+        {
+            Debug.LogWarning("<color=yellow>[Camera]</color> Motion Blur not found in Volume Profile. Add it for boost blur effect!");
+        }
+        
+        // Initialize Lens Distortion (if it exists)
+        if (hasLensDistortion)
+        {
+            // We'll control the intensity dynamically
+            lensDistortionEffect.intensity.overrideState = true;
+            currentLensDistortion = 0f; // Start at 0, only activate during boost
+            lensDistortionEffect.intensity.value = 0f;
+            
+            if (showDebugInfo) 
+                Debug.Log("<color=green>[Camera]</color> Lens Distortion ready for boost");
+        }
+        else if (showDebugInfo)
+        {
+            Debug.LogWarning("<color=yellow>[Camera]</color> Lens Distortion not found in Volume Profile. Add it for boost distortion effect!");
+        }
+        
+        effectsInitialized = hasMotionBlur || hasLensDistortion;
+        
+        if (!effectsInitialized && showDebugInfo)
+        {
+            Debug.LogWarning("<color=yellow>[Camera]</color> No boost effects found! Add Motion Blur and/or Lens Distortion to your Volume Profile.");
         }
     }
     
@@ -122,7 +194,7 @@ public class CameraFollow : MonoBehaviour
         float speed = targetRb != null ? targetRb.linearVelocity.magnitude : 0f;
         bool isBoosting = vehicleController != null && vehicleController.IsBoosting();
         
-        // Handle boost camera zoom
+        // Handle boost camera zoom and effects
         UpdateBoostCamera(isBoosting);
         
         // Calculate base distance from speed
@@ -176,13 +248,6 @@ public class CameraFollow : MonoBehaviour
 
     void UpdateBoostCamera(bool isBoosting)
     {
-        // Store base values on first boost
-        if (isBoosting && !hasStoredBaseValues)
-        {
-            StoreBasePostProcessingValues();
-            hasStoredBaseValues = true;
-        }
-        
         // Smoothly adjust boost modifiers
         if (isBoosting)
         {
@@ -190,8 +255,11 @@ public class CameraFollow : MonoBehaviour
             boostDistanceModifier = Mathf.Lerp(boostDistanceModifier, boostZoomDistance - maxDistance, boostZoomSpeed * Time.deltaTime);
             boostFOVModifier = Mathf.Lerp(boostFOVModifier, boostFOVIncrease, boostZoomSpeed * Time.deltaTime);
             
-            // Apply boost visual effects
-            ApplyBoostVisualEffects(true);
+            // Apply boost visual effects (blur + distortion)
+            if (effectsInitialized)
+            {
+                ApplyBoostVisualEffects(true);
+            }
         }
         else
         {
@@ -199,54 +267,40 @@ public class CameraFollow : MonoBehaviour
             boostDistanceModifier = Mathf.Lerp(boostDistanceModifier, 0f, boostReturnSpeed * Time.deltaTime);
             boostFOVModifier = Mathf.Lerp(boostFOVModifier, 0f, boostReturnSpeed * Time.deltaTime);
             
-            // Return post-processing to normal
-            ApplyBoostVisualEffects(false);
-        }
-    }
-    
-    void StoreBasePostProcessingValues()
-    {
-        if (bloomEffect != null && bloomEffect.intensity.overrideState)
-        {
-            baseBloomIntensity = bloomEffect.intensity.value;
-        }
-        
-        if (colorAdjustments != null && colorAdjustments.saturation.overrideState)
-        {
-            baseSaturation = colorAdjustments.saturation.value;
-        }
-        
-        if (vignetteEffect != null && vignetteEffect.intensity.overrideState)
-        {
-            baseVignetteIntensity = vignetteEffect.intensity.value;
+            // Return post-processing to normal (0)
+            if (effectsInitialized)
+            {
+                ApplyBoostVisualEffects(false);
+            }
         }
     }
     
     void ApplyBoostVisualEffects(bool isBoosting)
     {
-        if (postProcessVolume == null) return;
-        
         float speed = boostEffectSpeed * Time.deltaTime;
         
-        // Bloom effect (intense glow during boost)
-        if (bloomEffect != null)
+        // Motion Blur - only active during boost
+        if (motionBlurEffect != null)
         {
-            float targetBloom = isBoosting ? baseBloomIntensity + boostBloomIntensity : baseBloomIntensity;
-            bloomEffect.intensity.value = Mathf.Lerp(bloomEffect.intensity.value, targetBloom, speed);
+            float targetBlur = isBoosting ? boostMotionBlur : 0f;
+            currentMotionBlurIntensity = Mathf.Lerp(currentMotionBlurIntensity, targetBlur, speed);
+            motionBlurEffect.intensity.value = currentMotionBlurIntensity;
         }
         
-        // Saturation (more vibrant colors during boost)
-        if (colorAdjustments != null)
+        // Lens Distortion - only active during boost
+        if (lensDistortionEffect != null)
         {
-            float targetSaturation = isBoosting ? baseSaturation + boostSaturation : baseSaturation;
-            colorAdjustments.saturation.value = Mathf.Lerp(colorAdjustments.saturation.value, targetSaturation, speed);
+            float targetDistortion = isBoosting ? boostLensDistortion : 0f;
+            currentLensDistortion = Mathf.Lerp(currentLensDistortion, targetDistortion, speed);
+            lensDistortionEffect.intensity.value = currentLensDistortion;
         }
-        
-        // Vignette (darker edges for tunnel vision effect)
-        if (vignetteEffect != null)
-        {
-            float targetVignette = isBoosting ? baseVignetteIntensity + boostVignetteIntensity : baseVignetteIntensity;
-            vignetteEffect.intensity.value = Mathf.Lerp(vignetteEffect.intensity.value, targetVignette, speed);
-        }
+    }
+    
+    // Helper method to manually reinitialize effects (useful if volume changes)
+    [ContextMenu("Reinitialize Boost Effects")]
+    public void ReinitializeBoostEffects()
+    {
+        effectsInitialized = false;
+        InitializeBoostEffects();
     }
 }

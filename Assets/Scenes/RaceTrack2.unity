@@ -1830,7 +1830,7 @@ MonoBehaviour:
   rotationSpeed: 180
   floatAmplitude: 0.5
   floatFrequency: 1
-  boostDuration: 5
+  boostDuration: 4
   respawns: 1
   respawnTime: 5
   visualObject: {fileID: 466243802}
@@ -5850,7 +5850,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &616983894
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6113,7 +6113,7 @@ MonoBehaviour:
   rotationSpeed: 180
   floatAmplitude: 0.5
   floatFrequency: 1
-  boostDuration: 5
+  boostDuration: 4
   respawns: 1
   respawnTime: 5
   visualObject: {fileID: 719094503}
@@ -6357,7 +6357,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &758252640
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6737,7 +6737,7 @@ MonoBehaviour:
   rotationSpeed: 180
   floatAmplitude: 0.5
   floatFrequency: 1
-  boostDuration: 5
+  boostDuration: 4
   respawns: 1
   respawnTime: 5
   visualObject: {fileID: 789408401}
@@ -38046,13 +38046,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 32c83aca98dd70441a60282e1b3e4c44, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerRespawn
-  lastCheckpoint: {fileID: 8076730032905557644}
+  trackCheckPoints: {fileID: 758252640}
+  defaultSpawnPoint: {fileID: 8076730032905557644}
   respawnDelay: 0.5
+  spawnHeightOffset: 1
+  spawnDistanceBehind: 5
   fadeImage: {fileID: 1144669304}
   fadeSpeed: 1.5
   sfxSource: {fileID: 1734718298}
   waterBubbleClip: {fileID: 8300000, guid: 8b86840881b53494e86daebc007b4496, type: 3}
   cameraFollow: {fileID: 1602055432200825246}
+  showDebugInfo: 0
 --- !u!1 &841965774
 GameObject:
   m_ObjectHideFlags: 0
@@ -38219,46 +38223,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9fd4e9f27d1ee84ab8aeaa8743f71c5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpeedBar
-  fillBar: {fileID: 1639268531}
-  needle: {fileID: 0}
-  speedText: {fileID: 0}
-  vehicleRigidbody: {fileID: 3022350042532499606}
-  maxSpeed: 30
-  smoothing: 5
-  speedGradient:
-    serializedVersion: 2
-    key0: {r: 0.0754652, g: 1, b: 0, a: 1}
-    key1: {r: 1, g: 0.99243414, b: 0, a: 1}
-    key2: {r: 1, g: 0.24298395, b: 0, a: 1}
-    key3: {r: 0, g: 0, b: 0, a: 0}
-    key4: {r: 0, g: 0, b: 0, a: 0}
-    key5: {r: 0, g: 0, b: 0, a: 0}
-    key6: {r: 0, g: 0, b: 0, a: 0}
-    key7: {r: 0, g: 0, b: 0, a: 0}
-    ctime0: 0
-    ctime1: 32768
-    ctime2: 65535
-    ctime3: 0
-    ctime4: 0
-    ctime5: 0
-    ctime6: 0
-    ctime7: 0
-    atime0: 0
-    atime1: 32768
-    atime2: 65535
-    atime3: 0
-    atime4: 0
-    atime5: 0
-    atime6: 0
-    atime7: 0
-    m_Mode: 0
-    m_ColorSpace: -1
-    m_NumColorKeys: 3
-    m_NumAlphaKeys: 3
-  minNeedleAngle: 180
-  maxNeedleAngle: -90
-  enableShake: 1
-  shakeIntensity: 1.2
+  vehicleController: {fileID: 797906489}
+  speedBarFill: {fileID: 1639268531}
+  speedText: {fileID: 1965071201}
+  maxDisplaySpeed: 60
+  fillSmoothing: 8
+  lowSpeedColor: {r: 0.2, g: 0.8, b: 0.2, a: 1}
+  midSpeedColor: {r: 0.8, g: 0.8, b: 0.2, a: 1}
+  highSpeedColor: {r: 0.8, g: 0.2, b: 0.2, a: 1}
+  boostColor: {r: 0.3, g: 0.6, b: 1, a: 1}
+  pulseOnBoost: 1
+  boostPulseSpeed: 10
+  boostPulseAmount: 0.15
+  showSpeedText: 1
+  speedFormat: 0
+  speedUnit: ' km/h'
 --- !u!224 &890014186
 RectTransform:
   m_ObjectHideFlags: 0
@@ -38273,6 +38252,7 @@ RectTransform:
   m_Children:
   - {fileID: 219579267}
   - {fileID: 1639268533}
+  - {fileID: 1965071200}
   m_Father: {fileID: 616983897}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -39421,7 +39401,7 @@ MonoBehaviour:
   rotationSpeed: 180
   floatAmplitude: 0.5
   floatFrequency: 1
-  boostDuration: 5
+  boostDuration: 4
   respawns: 1
   respawnTime: 5
   visualObject: {fileID: 1155920372}
@@ -46521,7 +46501,7 @@ MonoBehaviour:
   rotationSpeed: 180
   floatAmplitude: 0.5
   floatFrequency: 1
-  boostDuration: 5
+  boostDuration: 4
   respawns: 1
   respawnTime: 5
   visualObject: {fileID: 1666794198}
@@ -47141,6 +47121,143 @@ Mesh:
       - serializedVersion: 1
         m_IndexStart: 0
         m_IndexCount: 0
+--- !u!1 &1965071199
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1965071200}
+  - component: {fileID: 1965071202}
+  - component: {fileID: 1965071201}
+  m_Layer: 5
+  m_Name: SpeedText
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1965071200
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1965071199}
+  m_LocalRotation: {x: -0, y: -0, z: 0.06918, w: 0.9976042}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 890014186}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 7.934}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: -609.2307, y: -261.6}
+  m_SizeDelta: {x: 200, y: 50}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1965071201
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1965071199}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_text: Xkm/h
+  m_isRightToLeft: 0
+  m_fontAsset: {fileID: 11400000, guid: c1c14a32ce50b164f99a507d2fe5b694, type: 2}
+  m_sharedMaterial: {fileID: -4051918566195781456, guid: c1c14a32ce50b164f99a507d2fe5b694, type: 2}
+  m_fontSharedMaterials: []
+  m_fontMaterial: {fileID: 0}
+  m_fontMaterials: []
+  m_fontColor32:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
+  m_enableVertexGradient: 0
+  m_colorMode: 3
+  m_fontColorGradient:
+    topLeft: {r: 1, g: 1, b: 1, a: 1}
+    topRight: {r: 1, g: 1, b: 1, a: 1}
+    bottomLeft: {r: 1, g: 1, b: 1, a: 1}
+    bottomRight: {r: 1, g: 1, b: 1, a: 1}
+  m_fontColorGradientPreset: {fileID: 0}
+  m_spriteAsset: {fileID: 0}
+  m_tintAllSprites: 0
+  m_StyleSheet: {fileID: 0}
+  m_TextStyleHashCode: -1183493901
+  m_overrideHtmlColors: 0
+  m_faceColor:
+    serializedVersion: 2
+    rgba: 4294967295
+  m_fontSize: 36
+  m_fontSizeBase: 36
+  m_fontWeight: 400
+  m_enableAutoSizing: 0
+  m_fontSizeMin: 18
+  m_fontSizeMax: 72
+  m_fontStyle: 0
+  m_HorizontalAlignment: 1
+  m_VerticalAlignment: 256
+  m_textAlignment: 65535
+  m_characterSpacing: 0
+  m_characterHorizontalScale: 1
+  m_wordSpacing: 0
+  m_lineSpacing: 0
+  m_lineSpacingMax: 0
+  m_paragraphSpacing: 0
+  m_charWidthMaxAdj: 0
+  m_TextWrappingMode: 1
+  m_wordWrappingRatios: 0.4
+  m_overflowMode: 0
+  m_linkedTextComponent: {fileID: 0}
+  parentLinkedComponent: {fileID: 0}
+  m_enableKerning: 0
+  m_ActiveFontFeatures: 6e72656b
+  m_enableExtraPadding: 0
+  checkPaddingRequired: 0
+  m_isRichText: 1
+  m_EmojiFallbackSupport: 1
+  m_parseCtrlCharacters: 1
+  m_isOrthographic: 1
+  m_isCullingEnabled: 0
+  m_horizontalMapping: 0
+  m_verticalMapping: 0
+  m_uvLineOffset: 0
+  m_geometrySortingOrder: 0
+  m_IsTextObjectScaleStatic: 0
+  m_VertexBufferAutoSizeReduction: 0
+  m_useMaxVisibleDescender: 1
+  m_pageToDisplay: 1
+  m_margin: {x: 0, y: 0, z: 0, w: 0}
+  m_isUsingLegacyAnimationComponent: 0
+  m_isVolumetricText: 0
+  m_hasFontAssetChanged: 0
+  m_baseMaterial: {fileID: 0}
+  m_maskOffset: {x: 0, y: 0, z: 0, w: 0}
+--- !u!222 &1965071202
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1965071199}
+  m_CullTransparentMesh: 1
 --- !u!4 &2005984461
 Transform:
   m_ObjectHideFlags: 0
@@ -47314,7 +47431,7 @@ MonoBehaviour:
   rotationSpeed: 180
   floatAmplitude: 0.5
   floatFrequency: 1
-  boostDuration: 5
+  boostDuration: 4
   respawns: 1
   respawnTime: 5
   visualObject: {fileID: 2034030145}
@@ -49399,17 +49516,17 @@ MonoBehaviour:
   maxDistance: 14
   speedForMaxZoom: 25
   zoomSmoothing: 4
-  boostZoomDistance: 18
+  boostZoomDistance: 14
   boostZoomSpeed: 8
-  boostReturnSpeed: 3
-  boostFOVIncrease: 12
+  boostReturnSpeed: 2
+  boostFOVIncrease: 10
   maxSpeedFOV: 75
   normalFOV: 60
   postProcessVolume: {fileID: 2097586956}
-  boostBloomIntensity: 6
-  boostSaturation: 8
-  boostVignetteIntensity: 0.2
+  boostMotionBlur: 4
+  boostLensDistortion: -0.6
   boostEffectSpeed: 5
+  showDebugInfo: 0
 --- !u!1 &1659240016289321060
 GameObject:
   m_ObjectHideFlags: 0
