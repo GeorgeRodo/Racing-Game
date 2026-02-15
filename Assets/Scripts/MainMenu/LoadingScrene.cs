@@ -10,6 +10,7 @@ public class LoadingScreen : MonoBehaviour
     [Header("UI References")]
     public GameObject loadingPanel;
     public Image expandingCircle;  // The circle that expands from click
+    public TextMeshProUGUI loadingTitle;  // The "LOADING" title text
     public TextMeshProUGUI progressText;
     public TextMeshProUGUI loadingTipText;
     
@@ -20,6 +21,11 @@ public class LoadingScreen : MonoBehaviour
     public float expandDuration = 0.6f;  // How long the circle takes to fill screen
     public AnimationCurve expandCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
     public float maxCircleSize = 3000f;  // Size to cover whole screen
+    public float delayBeforeShrink = 0.2f;  // Delay after hiding text before shrinking
+    
+    [Header("Text Fade Animation")]
+    public float textFadeDuration = 0.4f;  // How long text fades in/out
+    public AnimationCurve textFadeCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
     
     [Header("Loading Tips")]
     public string[] loadingTips = new string[]
@@ -107,6 +113,7 @@ public class LoadingScreen : MonoBehaviour
             }
             
             // Hide all text during expansion
+            if (loadingTitle != null) loadingTitle.gameObject.SetActive(false);
             if (progressText != null) progressText.gameObject.SetActive(false);
             if (loadingTipText != null) loadingTipText.gameObject.SetActive(false);
         }
@@ -130,18 +137,11 @@ public class LoadingScreen : MonoBehaviour
             }
         }
         
-        // NOW show the loading UI
-        if (progressText != null)
-        {
-            progressText.gameObject.SetActive(true);
-            progressText.text = "0%";
-        }
+        // Small delay to ensure circle is completely gone before showing text
+        yield return new WaitForSeconds(0.1f);
         
-        if (loadingTipText != null && loadingTips.Length > 0)
-        {
-            loadingTipText.gameObject.SetActive(true);
-            loadingTipText.text = loadingTips[Random.Range(0, loadingTips.Length)];
-        }
+        // NOW fade in the loading UI smoothly
+        yield return StartCoroutine(FadeInText());
         
         Debug.Log($"[LoadingScreen] Starting async load of: {sceneName}");
         
@@ -180,26 +180,56 @@ public class LoadingScreen : MonoBehaviour
         Debug.Log("[LoadingScreen] Loading complete, activating scene");
         
         // Small delay to show 100%
-        yield return new WaitForSeconds(0.3f);
+        yield return new WaitForSeconds(0.2f);
+        
+        // FADE OUT TEXT smoothly before scene activates
+        Debug.Log("[LoadingScreen] Fading out loading text");
+        yield return StartCoroutine(FadeOutText());
+        
+        Debug.Log("[LoadingScreen] About to activate scene");
         
         // Activate the scene (but we'll still see loading screen)
         asyncLoad.allowSceneActivation = true;
         
+        Debug.Log("[LoadingScreen] Scene activation triggered, waiting for isDone");
+        
         // Wait for scene to actually load
+        int waitFrames = 0;
         while (!asyncLoad.isDone)
         {
+            waitFrames++;
+            if (waitFrames % 10 == 0)
+            {
+                Debug.Log($"[LoadingScreen] Waiting for scene... frame {waitFrames}, isDone={asyncLoad.isDone}");
+            }
             yield return null;
         }
         
+        Debug.Log($"[LoadingScreen] Scene is DONE after {waitFrames} frames!");
         Debug.Log("[LoadingScreen] Scene activated, starting exit animation");
         
-        // REVERSE ANIMATION: Hide text, show circle, shrink it
+        // Ensure our loading screen objects are still active
+        if (loadingPanel == null || expandingCircle == null)
+        {
+            Debug.LogError("[LoadingScreen] Loading panel or circle became null after scene load!");
+            isLoading = false;
+            yield break;
+        }
         
-        // Hide loading text
-        if (progressText != null) progressText.gameObject.SetActive(false);
-        if (loadingTipText != null) loadingTipText.gameObject.SetActive(false);
+        if (!loadingPanel.activeSelf)
+        {
+            Debug.LogWarning("[LoadingScreen] Loading panel was deactivated! Reactivating...");
+            loadingPanel.SetActive(true);
+        }
         
-        // Show the circle again (full screen size)
+        // Wait for the first frame of new scene to fully render
+        yield return new WaitForEndOfFrame();
+        
+        // REVERSE ANIMATION: Show circle FIRST, then transparent, then shrink
+        
+        Debug.Log("[LoadingScreen] Showing circle FIRST at full size");
+        
+        // SHOW circle FIRST (full screen) BEFORE making panel transparent
         if (expandingCircle != null)
         {
             RectTransform circleRect = expandingCircle.rectTransform;
@@ -209,19 +239,36 @@ public class LoadingScreen : MonoBehaviour
             circleRect.position = new Vector2(Screen.width / 2f, Screen.height / 2f);
             
             expandingCircle.gameObject.SetActive(true);
+            
+            Debug.Log($"[LoadingScreen] Circle activated at center, size: {maxCircleSize}");
+        }
+        else
+        {
+            Debug.LogError("[LoadingScreen] Expanding circle is null!");
         }
         
-        // Make panel transparent (circle is the black overlay now)
+        // Wait one frame to ensure circle renders on top
+        yield return null;
+        
+        Debug.Log("[LoadingScreen] NOW making panel transparent");
+        
+        // NOW make panel transparent (circle is already covering everything)
         if (loadingPanel != null)
         {
             Image panelImage = loadingPanel.GetComponent<Image>();
             if (panelImage != null)
             {
                 panelImage.color = new Color(0, 0, 0, 0); // Transparent
+                Debug.Log("[LoadingScreen] Panel made transparent");
             }
         }
         
-        // Shrink the circle to reveal the new scene!
+        // Wait the delay with circle visible and full screen
+        yield return new WaitForSeconds(delayBeforeShrink);
+        
+        Debug.Log("[LoadingScreen] Starting shrink animation NOW");
+        
+        // NOW shrink the circle to reveal the new scene!
         yield return StartCoroutine(ShrinkCircleAnimation());
         
         // Now hide everything
@@ -281,13 +328,13 @@ public class LoadingScreen : MonoBehaviour
     {
         if (expandingCircle == null)
         {
-            Debug.LogWarning("[LoadingScreen] No expanding circle assigned!");
+            Debug.LogError("[LoadingScreen] No expanding circle assigned for shrink!");
             yield break;
         }
         
         RectTransform circleRect = expandingCircle.rectTransform;
         
-        Debug.Log("[LoadingScreen] Starting shrink animation");
+        Debug.Log($"[LoadingScreen] Starting shrink animation - Initial size: {circleRect.sizeDelta}");
         
         float elapsed = 0f;
         
@@ -307,6 +354,89 @@ public class LoadingScreen : MonoBehaviour
         // Ensure it's fully shrunk
         circleRect.sizeDelta = Vector2.zero;
         
-        Debug.Log("[LoadingScreen] Shrink animation complete");
+        Debug.Log("[LoadingScreen] Shrink animation complete - Final size: 0");
+    }
+    
+    IEnumerator FadeInText()
+    {
+        // Activate all text objects first (but invisible)
+        if (loadingTitle != null)
+        {
+            loadingTitle.gameObject.SetActive(true);
+            loadingTitle.alpha = 0f;
+        }
+        
+        if (progressText != null)
+        {
+            progressText.gameObject.SetActive(true);
+            progressText.alpha = 0f;
+            progressText.text = "0%";
+        }
+        
+        if (loadingTipText != null && loadingTips.Length > 0)
+        {
+            loadingTipText.gameObject.SetActive(true);
+            loadingTipText.alpha = 0f;
+            loadingTipText.text = loadingTips[Random.Range(0, loadingTips.Length)];
+        }
+        
+        float elapsed = 0f;
+        
+        // Fade in smoothly
+        while (elapsed < textFadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / textFadeDuration;
+            float alpha = textFadeCurve.Evaluate(t);
+            
+            if (loadingTitle != null) loadingTitle.alpha = alpha;
+            if (progressText != null) progressText.alpha = alpha;
+            if (loadingTipText != null) loadingTipText.alpha = alpha;
+            
+            yield return null;
+        }
+        
+        // Ensure fully visible
+        if (loadingTitle != null) loadingTitle.alpha = 1f;
+        if (progressText != null) progressText.alpha = 1f;
+        if (loadingTipText != null) loadingTipText.alpha = 1f;
+    }
+    
+    IEnumerator FadeOutText()
+    {
+        float elapsed = 0f;
+        
+        // Fade out smoothly
+        while (elapsed < textFadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = elapsed / textFadeDuration;
+            float alpha = 1f - textFadeCurve.Evaluate(t);
+            
+            if (loadingTitle != null) loadingTitle.alpha = alpha;
+            if (progressText != null) progressText.alpha = alpha;
+            if (loadingTipText != null) loadingTipText.alpha = alpha;
+            
+            yield return null;
+        }
+        
+        // Ensure fully invisible and deactivate
+        if (loadingTitle != null)
+        {
+            loadingTitle.alpha = 0f;
+            loadingTitle.gameObject.SetActive(false);
+        }
+        
+        if (progressText != null)
+        {
+            progressText.alpha = 0f;
+            progressText.gameObject.SetActive(false);
+        }
+        
+        if (loadingTipText != null)
+        {
+            loadingTipText.alpha = 0f;
+            loadingTipText.gameObject.SetActive(false);
+        }
     }
 }

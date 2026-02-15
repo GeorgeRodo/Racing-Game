@@ -217,8 +217,6 @@ RectTransform:
   - {fileID: 958416038}
   - {fileID: 1578850454}
   - {fileID: 1427188017}
-  - {fileID: 996134879}
-  - {fileID: 179691443}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -553,6 +551,8 @@ GameObject:
   - component: {fileID: 179691443}
   - component: {fileID: 179691445}
   - component: {fileID: 179691444}
+  - component: {fileID: 179691447}
+  - component: {fileID: 179691446}
   m_Layer: 5
   m_Name: LoadingScreen
   m_TagString: Untagged
@@ -569,20 +569,20 @@ RectTransform:
   m_GameObject: {fileID: 179691442}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2003447064}
   - {fileID: 576671641}
   - {fileID: 1401703153}
   - {fileID: 1719732822}
-  m_Father: {fileID: 68903519}
+  m_Father: {fileID: 996134879}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMax: {x: 0, y: 0}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
-  m_Pivot: {x: 0.5, y: 0.5}
+  m_Pivot: {x: 0, y: 0}
 --- !u!114 &179691444
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -621,6 +621,52 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 179691442}
   m_CullTransparentMesh: 1
+--- !u!114 &179691446
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 179691442}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cd44c1031e13a943bb63640046fad76, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.CanvasScaler
+  m_UiScaleMode: 1
+  m_ReferencePixelsPerUnit: 100
+  m_ScaleFactor: 1
+  m_ReferenceResolution: {x: 1920, y: 1080}
+  m_ScreenMatchMode: 0
+  m_MatchWidthOrHeight: 0
+  m_PhysicalUnit: 3
+  m_FallbackScreenDPI: 96
+  m_DefaultSpriteDPI: 96
+  m_DynamicPixelsPerUnit: 1
+  m_PresetInfoIsWorld: 0
+--- !u!223 &179691447
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 179691442}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 0
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
+  m_PixelPerfect: 1
+  m_ReceivesEvents: 1
+  m_OverrideSorting: 0
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_AdditionalShaderChannelsFlag: 25
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 9999
+  m_TargetDisplay: 0
 --- !u!1 &196161164
 GameObject:
   m_ObjectHideFlags: 0
@@ -2830,16 +2876,17 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 996134878}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.60022056, y: 0.60022056, z: 0.60022056}
   m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 68903519}
+  m_Children:
+  - {fileID: 179691443}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 1063.7755, y: 487.32083}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &996134880
@@ -2856,9 +2903,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LoadingScreen
   loadingPanel: {fileID: 179691442}
   expandingCircle: {fileID: 1719732823}
+  loadingTitle: {fileID: 576671642}
   progressText: {fileID: 2003447065}
   loadingTipText: {fileID: 1401703154}
-  minimumLoadTime: 10
+  minimumLoadTime: 5
   expandDuration: 0.6
   expandCurve:
     serializedVersion: 2
@@ -2885,6 +2933,32 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   maxCircleSize: 3000
+  delayBeforeShrink: 0.4
+  textFadeDuration: 0.4
+  textFadeCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   loadingTips:
   - 'TIP: USE WASD TO MOVE'
 --- !u!1 &1030697731
@@ -4926,7 +5000,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -180, y: 108}
+  m_AnchoredPosition: {x: -36.8, y: 24.3}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2003447065
@@ -5788,6 +5862,7 @@ SceneRoots:
   - {fileID: 203844589}
   - {fileID: 68903519}
   - {fileID: 617686503}
+  - {fileID: 996134879}
   - {fileID: 81303591}
   - {fileID: 155676149}
   - {fileID: 448570800}
