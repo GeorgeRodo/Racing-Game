@@ -14,6 +14,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/RaceTrack1.unity
     guid: f63f60c0f22703343b700573bdead613
+  - enabled: 1
+    path: Assets/Scenes/RaceTrack2.unity
+    guid: a8d732c77af8c7645b0bc889987a68c8
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

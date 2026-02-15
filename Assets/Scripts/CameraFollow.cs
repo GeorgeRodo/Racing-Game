@@ -32,6 +32,13 @@ public class CameraFollow : MonoBehaviour
     public float maxSpeedFOV = 75f;
     public float normalFOV = 60f;
     
+    [Header("Boost Visual Effects")]
+    public UnityEngine.Rendering.Volume postProcessVolume;  // URP Volume
+    public float boostBloomIntensity = 8f;      // Extra bloom during boost
+    public float boostSaturation = 10f;          // Extra color saturation
+    public float boostVignetteIntensity = 0.2f;  // Extra vignette darkness
+    public float boostEffectSpeed = 5f;          // How fast effects transition
+    
     private Camera cam;
     private Rigidbody targetRb;
     private CustomVehicleController vehicleController;
@@ -45,6 +52,22 @@ public class CameraFollow : MonoBehaviour
     // Boost state
     private float boostDistanceModifier = 0f;
     private float boostFOVModifier = 0f;
+    
+    // Water sinking effect
+    private bool isFrozen = false;
+    private Vector3 frozenPosition;
+    private Quaternion frozenRotation;
+    
+    // Post-processing effect references
+    private UnityEngine.Rendering.Universal.Bloom bloomEffect;
+    private UnityEngine.Rendering.Universal.ColorAdjustments colorAdjustments;
+    private UnityEngine.Rendering.Universal.Vignette vignetteEffect;
+    
+    // Base values for post-processing (to return to after boost)
+    private float baseBloomIntensity = 0f;
+    private float baseSaturation = 0f;
+    private float baseVignetteIntensity = 0f;
+    private bool hasStoredBaseValues = false;
 
     void Start()
     {
@@ -56,11 +79,45 @@ public class CameraFollow : MonoBehaviour
         }
         currentOffset = offset;
         currentDistance = offset.magnitude;
+        
+        // Get post-processing effects if volume is assigned
+        if (postProcessVolume != null && postProcessVolume.profile != null)
+        {
+            postProcessVolume.profile.TryGet(out bloomEffect);
+            postProcessVolume.profile.TryGet(out colorAdjustments);
+            postProcessVolume.profile.TryGet(out vignetteEffect);
+        }
+    }
+    
+    /// <summary>
+    /// Freezes the camera at its current position (for water sinking effect)
+    /// </summary>
+    public void FreezeCamera()
+    {
+        isFrozen = true;
+        frozenPosition = transform.position;
+        frozenRotation = transform.rotation;
+    }
+    
+    /// <summary>
+    /// Unfreezes the camera to resume following the target
+    /// </summary>
+    public void UnfreezeCamera()
+    {
+        isFrozen = false;
     }
 
     void LateUpdate()
     {
         if (target == null) return;
+        
+        // If camera is frozen (car sinking in water), don't update position
+        if (isFrozen)
+        {
+            transform.position = frozenPosition;
+            transform.rotation = frozenRotation;
+            return;
+        }
 
         float speed = targetRb != null ? targetRb.linearVelocity.magnitude : 0f;
         bool isBoosting = vehicleController != null && vehicleController.IsBoosting();
@@ -119,18 +176,77 @@ public class CameraFollow : MonoBehaviour
 
     void UpdateBoostCamera(bool isBoosting)
     {
+        // Store base values on first boost
+        if (isBoosting && !hasStoredBaseValues)
+        {
+            StoreBasePostProcessingValues();
+            hasStoredBaseValues = true;
+        }
+        
         // Smoothly adjust boost modifiers
         if (isBoosting)
         {
             // Zoom back and increase FOV during boost
             boostDistanceModifier = Mathf.Lerp(boostDistanceModifier, boostZoomDistance - maxDistance, boostZoomSpeed * Time.deltaTime);
             boostFOVModifier = Mathf.Lerp(boostFOVModifier, boostFOVIncrease, boostZoomSpeed * Time.deltaTime);
+            
+            // Apply boost visual effects
+            ApplyBoostVisualEffects(true);
         }
         else
         {
             // Return to normal slowly
             boostDistanceModifier = Mathf.Lerp(boostDistanceModifier, 0f, boostReturnSpeed * Time.deltaTime);
             boostFOVModifier = Mathf.Lerp(boostFOVModifier, 0f, boostReturnSpeed * Time.deltaTime);
+            
+            // Return post-processing to normal
+            ApplyBoostVisualEffects(false);
+        }
+    }
+    
+    void StoreBasePostProcessingValues()
+    {
+        if (bloomEffect != null && bloomEffect.intensity.overrideState)
+        {
+            baseBloomIntensity = bloomEffect.intensity.value;
+        }
+        
+        if (colorAdjustments != null && colorAdjustments.saturation.overrideState)
+        {
+            baseSaturation = colorAdjustments.saturation.value;
+        }
+        
+        if (vignetteEffect != null && vignetteEffect.intensity.overrideState)
+        {
+            baseVignetteIntensity = vignetteEffect.intensity.value;
+        }
+    }
+    
+    void ApplyBoostVisualEffects(bool isBoosting)
+    {
+        if (postProcessVolume == null) return;
+        
+        float speed = boostEffectSpeed * Time.deltaTime;
+        
+        // Bloom effect (intense glow during boost)
+        if (bloomEffect != null)
+        {
+            float targetBloom = isBoosting ? baseBloomIntensity + boostBloomIntensity : baseBloomIntensity;
+            bloomEffect.intensity.value = Mathf.Lerp(bloomEffect.intensity.value, targetBloom, speed);
+        }
+        
+        // Saturation (more vibrant colors during boost)
+        if (colorAdjustments != null)
+        {
+            float targetSaturation = isBoosting ? baseSaturation + boostSaturation : baseSaturation;
+            colorAdjustments.saturation.value = Mathf.Lerp(colorAdjustments.saturation.value, targetSaturation, speed);
+        }
+        
+        // Vignette (darker edges for tunnel vision effect)
+        if (vignetteEffect != null)
+        {
+            float targetVignette = isBoosting ? baseVignetteIntensity + boostVignetteIntensity : baseVignetteIntensity;
+            vignetteEffect.intensity.value = Mathf.Lerp(vignetteEffect.intensity.value, targetVignette, speed);
         }
     }
 }

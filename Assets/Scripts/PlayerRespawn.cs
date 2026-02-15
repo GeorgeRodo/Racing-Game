@@ -14,7 +14,10 @@ public class PlayerRespawn : MonoBehaviour
 
     [Header("Audio Settings")]
     public AudioSource sfxSource; 
-    public AudioClip waterBubbleClip; 
+    public AudioClip waterBubbleClip;
+    
+    [Header("Camera Reference")]
+    public CameraFollow cameraFollow; // Reference to camera script
 
     private Rigidbody rb;
     private CustomVehicleController vehicleController;
@@ -30,6 +33,16 @@ public class PlayerRespawn : MonoBehaviour
     {
         if (other.CompareTag("Water") && !isRespawning)
         {
+            // Immediately disable vehicle controller to stop driving
+            if (vehicleController != null)
+            {
+                vehicleController.enabled = false;
+            }
+            
+            // Stop all movement
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            
             if (sfxSource != null && waterBubbleClip != null)
                 sfxSource.PlayOneShot(waterBubbleClip);
 
@@ -45,6 +58,12 @@ public class PlayerRespawn : MonoBehaviour
     IEnumerator RespawnSequence()
     {
         isRespawning = true;
+        
+        // Freeze camera to watch car sink
+        if (cameraFollow != null)
+        {
+            cameraFollow.FreezeCamera();
+        }
 
         float alpha = 0;
         while (alpha < 1)
@@ -54,8 +73,8 @@ public class PlayerRespawn : MonoBehaviour
             yield return null;
         }
 
-        if (vehicleController != null) vehicleController.enabled = false;
-
+        // Vehicle controller already disabled in OnTriggerEnter
+        
         Vector3 spawnPosition = lastCheckpoint.position - (lastCheckpoint.forward * 5f) + Vector3.up;
         transform.position = spawnPosition;
         transform.rotation = lastCheckpoint.rotation;
@@ -65,7 +84,14 @@ public class PlayerRespawn : MonoBehaviour
 
         yield return new WaitForSeconds(respawnDelay);
 
+        // Re-enable vehicle controller for respawn
         if (vehicleController != null) vehicleController.enabled = true;
+        
+        // Unfreeze camera after respawn
+        if (cameraFollow != null)
+        {
+            cameraFollow.UnfreezeCamera();
+        }
 
         while (alpha > 0)
         {

@@ -47,6 +47,8 @@ public class CustomVehicleController : MonoBehaviour
     [Header("Stability")]
     public float sleepVelocityThreshold = 0.1f;
     public float sleepAngularThreshold = 0.1f;
+    public float maxDrivableSlope = 45f;  // Maximum angle (in degrees) the car can drive on
+    public float slopeCheckDistance = 1f; // How far to raycast to check ground angle
 
     [Header("Boost System")]
     public float boostMaxSpeedMultiplier = 1.5f;
@@ -119,10 +121,18 @@ public class CustomVehicleController : MonoBehaviour
         InitializeEngineSound(lowSound);
         InitializeEngineSound(midSound);
         
-        // Startup sound plays once
+        // Play startup sound immediately on spawn
         if (startupSound != null)
         {
             startupSound.loop = false;
+            startupSound.Play();
+            hasPlayedStartup = true;
+        }
+        
+        // Start with idle sound at full volume
+        if (idleSound != null)
+        {
+            idleSound.volume = masterVolume;
         }
     }
     
@@ -157,6 +167,9 @@ public class CustomVehicleController : MonoBehaviour
         EnforceSpeedLimits();
         ClampAngularVelocity();
         UpdateWheelVisuals();
+        
+        // Add extra downforce to combat floaty feeling (moon gravity fix)
+        rb.AddForce(Vector3.down * 2000f, ForceMode.Force);
     }
 
     void CaptureInput()
@@ -184,6 +197,33 @@ public class CustomVehicleController : MonoBehaviour
         {
             isAsleep = false;
         }
+    }
+    
+    bool IsOnDrivableSurface()
+    {
+        // Check if car is oriented correctly (not on its side or upside down)
+        float upDot = Vector3.Dot(transform.up, Vector3.up);
+        
+        // If car is tilted more than maxDrivableSlope degrees, it's not drivable
+        float angleFromUpright = Mathf.Acos(upDot) * Mathf.Rad2Deg;
+        
+        if (angleFromUpright > maxDrivableSlope)
+        {
+            return false;
+        }
+        
+        // Also check ground normal (optional - checks the slope of ground beneath)
+        if (Physics.Raycast(transform.position, -Vector3.up, out RaycastHit hit, slopeCheckDistance))
+        {
+            float groundAngle = Vector3.Angle(hit.normal, Vector3.up);
+            
+            if (groundAngle > maxDrivableSlope)
+            {
+                return false;
+            }
+        }
+        
+        return true;
     }
 
     void UpdateSteering()
@@ -215,17 +255,9 @@ public class CustomVehicleController : MonoBehaviour
     
     void UpdateEngineSound()
     {
-        // Play startup sound once when vehicle first moves
-        if (!hasPlayedStartup && startupSound != null)
-        {
-            if (Mathf.Abs(motorInput) > 0.1f || rb.linearVelocity.magnitude > 1f)
-            {
-                startupSound.Play();
-                hasPlayedStartup = true;
-            }
-        }
-        
-        float speed = rb.linearVelocity.magnitude;
+        // Only update if this component is enabled (race has started)
+        // But allow sound to play even when stationary
+        float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
         
         // Calculate volume for each sound layer based on speed
         float idleVolume = 0f;
@@ -383,6 +415,12 @@ public class CustomVehicleController : MonoBehaviour
     Vector3 CalculateDriveForce(Transform wheel)
     {
         if (IsFrontWheel(wheel))
+        {
+            return Vector3.zero;
+        }
+        
+        // Don't apply drive force if on a wall or too steep slope
+        if (!IsOnDrivableSurface())
         {
             return Vector3.zero;
         }

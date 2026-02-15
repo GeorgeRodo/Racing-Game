@@ -61,6 +61,10 @@ public class TrackCheckPoints : MonoBehaviour
 
             OnPlayerCorrectCheckpoint?.Invoke(this, EventArgs.Empty);
         }
+        else if ( checkpointIndex == nextCheckpointIndex - 1) //vazw apla else if gia na min emfanizei to wrong checkpoint message kai na epitrepoume ston player na pernaei apo idio checkpoint (gia fix sto respawn)  
+        {
+            Debug.Log($"Pased the same checkpoint ");
+        }
         else
         {
             Debug.Log($"WRONG checkpoint! Expected {nextCheckpointIndex}, got {checkpointIndex}");
@@ -79,6 +83,7 @@ public class TrackCheckPoints : MonoBehaviour
         // Check if race is complete
         if (currentLap > totalLaps)
         {
+            nextCheckpointIndex = checkpointSingleList.Count; // Set to out of bounds
             FinishRace();
         }
     }
@@ -93,6 +98,17 @@ public class TrackCheckPoints : MonoBehaviour
 
     private void UpdateVisibleCheckpoints()
     {
+        // Don't update checkpoints if race is finished
+        if (raceFinished || nextCheckpointIndex >= checkpointSingleList.Count)
+        {
+            // Hide all checkpoints when race is finished
+            foreach (var checkpoint in checkpointSingleList)
+            {
+                checkpoint.Hide();
+            }
+            return;
+        }
+        
         // Hide all checkpoints first
         foreach (var checkpoint in checkpointSingleList)
         {
