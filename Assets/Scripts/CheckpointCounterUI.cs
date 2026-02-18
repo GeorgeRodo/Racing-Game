@@ -8,13 +8,10 @@ public class CheckpointCounterUI : MonoBehaviour
 
     private void Start()
     {
-        // Subscribe to checkpoint events
         trackCheckPoints.OnPlayerCorrectCheckpoint += TrackCheckPoints_OnPlayerCorrectCheckpoint;
         
-        // Update the text immediately
         UpdateCheckpointText();
         
-        // Note: RaceManager will handle showing/hiding this UI during countdown
     }
 
     private void TrackCheckPoints_OnPlayerCorrectCheckpoint(object sender, System.EventArgs e)

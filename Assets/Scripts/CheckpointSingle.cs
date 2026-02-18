@@ -17,7 +17,6 @@ public class CheckpointSingle : MonoBehaviour
     
     private void OnTriggerEnter(Collider other)
     {
-        // Check for BOTH VehicleController AND CustomVehicleController
         if (other.TryGetComponent<CustomVehicleController>(out CustomVehicleController customVehicle) ||
             other.TryGetComponent<VehicleController>(out VehicleController vehicle))
         {

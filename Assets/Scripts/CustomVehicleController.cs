@@ -47,8 +47,8 @@ public class CustomVehicleController : MonoBehaviour
     [Header("Stability")]
     public float sleepVelocityThreshold = 0.1f;
     public float sleepAngularThreshold = 0.1f;
-    public float maxDrivableSlope = 45f;  // Maximum angle (in degrees) the car can drive on
-    public float slopeCheckDistance = 1f; // How far to raycast to check ground angle
+    public float maxDrivableSlope = 45f;  
+    public float slopeCheckDistance = 1f; 
 
     [Header("Boost System")]
     public float boostMaxSpeedMultiplier = 1.5f;
@@ -72,14 +72,14 @@ public class CustomVehicleController : MonoBehaviour
     public AudioSource midSound;
     
     [Header("Sound Tuning")]
-    public float volumeLerpSpeed = 5f;        // How quickly volume fades
-    public float lowSpeedThreshold = 10f;     // Speed where low sound is at max
-    public float midSpeedThreshold = 25f;     // Speed where mid sound is at max
-    public float masterVolume = 0.8f;         // Overall volume multiplier
+    public float volumeLerpSpeed = 5f;       
+    public float lowSpeedThreshold = 10f;     
+    public float midSpeedThreshold = 25f;     
+    public float masterVolume = 0.8f;         
 
     [Header("Debug")]
     public bool showDebugRays = true;
-    public bool showSoundDebug = false;  // Enable to see sound volumes in console
+    public bool showSoundDebug = false;  
 
     private Rigidbody rb;
     private Transform[] allWheels;
@@ -88,15 +88,12 @@ public class CustomVehicleController : MonoBehaviour
     private float currentSteerAngle;
     private bool isAsleep = false;
     
-    // Boost state
     private bool isBoosting = false;
     private float boostTimer = 0f;
     private float boostDuration = 0f;
     
-    // Speed display
     private int lastSpeedTier = 0;
-    
-    // Engine sound state
+
     private bool hasPlayedStartup = false;
 
     void Start()
@@ -116,12 +113,10 @@ public class CustomVehicleController : MonoBehaviour
             rearRightWheel
         };
         
-        // Initialize engine sounds
         InitializeEngineSound(idleSound);
         InitializeEngineSound(lowSound);
         InitializeEngineSound(midSound);
         
-        // Play startup sound immediately on spawn
         if (startupSound != null)
         {
             startupSound.loop = false;
@@ -129,7 +124,6 @@ public class CustomVehicleController : MonoBehaviour
             hasPlayedStartup = true;
         }
         
-        // Start with idle sound at full volume
         if (idleSound != null)
         {
             idleSound.volume = masterVolume;
@@ -168,7 +162,6 @@ public class CustomVehicleController : MonoBehaviour
         ClampAngularVelocity();
         UpdateWheelVisuals();
         
-        // Add extra downforce to combat floaty feeling (moon gravity fix)
         rb.AddForce(Vector3.down * 2000f, ForceMode.Force);
     }
 
@@ -201,10 +194,8 @@ public class CustomVehicleController : MonoBehaviour
     
     bool IsOnDrivableSurface()
     {
-        // Check if car is oriented correctly (not on its side or upside down)
         float upDot = Vector3.Dot(transform.up, Vector3.up);
         
-        // If car is tilted more than maxDrivableSlope degrees, it's not drivable
         float angleFromUpright = Mathf.Acos(upDot) * Mathf.Rad2Deg;
         
         if (angleFromUpright > maxDrivableSlope)
@@ -212,7 +203,6 @@ public class CustomVehicleController : MonoBehaviour
             return false;
         }
         
-        // Also check ground normal (optional - checks the slope of ground beneath)
         if (Physics.Raycast(transform.position, -Vector3.up, out RaycastHit hit, slopeCheckDistance))
         {
             float groundAngle = Vector3.Angle(hit.normal, Vector3.up);
@@ -255,41 +245,34 @@ public class CustomVehicleController : MonoBehaviour
     
     void UpdateEngineSound()
     {
-        // Only update if this component is enabled (race has started)
-        // But allow sound to play even when stationary
+
         float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
         
-        // Calculate volume for each sound layer based on speed
         float idleVolume = 0f;
         float lowVolume = 0f;
         float midVolume = 0f;
         
-        // IDLE to LOW transition (0 to lowSpeedThreshold)
         if (speed <= lowSpeedThreshold)
         {
             float transitionRatio = speed / lowSpeedThreshold;
             idleVolume = 1f - transitionRatio;
             lowVolume = transitionRatio;
         }
-        // LOW to MID transition (lowSpeedThreshold to midSpeedThreshold)
         else if (speed <= midSpeedThreshold)
         {
             float transitionRatio = (speed - lowSpeedThreshold) / (midSpeedThreshold - lowSpeedThreshold);
             lowVolume = 1f - transitionRatio;
             midVolume = transitionRatio;
         }
-        // HIGH SPEED (above midSpeedThreshold)
         else
         {
             midVolume = 1f;
         }
         
-        // Apply volumes with smooth lerping
         SetSoundVolume(idleSound, idleVolume);
         SetSoundVolume(lowSound, lowVolume);
         SetSoundVolume(midSound, midVolume);
         
-        // Debug output
         if (showSoundDebug)
         {
             Debug.Log($"Speed: {speed:F1} | Idle: {idleVolume:F2} | Low: {lowVolume:F2} | Mid: {midVolume:F2}");
@@ -300,7 +283,6 @@ public class CustomVehicleController : MonoBehaviour
     {
         if (source == null) return;
         
-        // Apply master volume and smooth lerp
         float finalVolume = targetVolume * masterVolume;
         source.volume = Mathf.Lerp(source.volume, finalVolume, Time.deltaTime * volumeLerpSpeed);
     }
@@ -419,7 +401,6 @@ public class CustomVehicleController : MonoBehaviour
             return Vector3.zero;
         }
         
-        // Don't apply drive force if on a wall or too steep slope
         if (!IsOnDrivableSurface())
         {
             return Vector3.zero;

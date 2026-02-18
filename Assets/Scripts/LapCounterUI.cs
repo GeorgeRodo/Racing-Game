@@ -8,14 +8,11 @@ public class LapCounterUI : MonoBehaviour
 
     private void Start()
     {
-        // Subscribe to events
         trackCheckPoints.OnPlayerCorrectCheckpoint += UpdateLapDisplay;
         trackCheckPoints.OnLapCompleted += UpdateLapDisplay;
         
-        // Update immediately
         UpdateLapDisplay(null, System.EventArgs.Empty);
         
-        // Note: RaceManager will handle showing/hiding this UI during countdown
     }
 
     private void UpdateLapDisplay(object sender, System.EventArgs e)

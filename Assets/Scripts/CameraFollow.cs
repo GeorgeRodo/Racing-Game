@@ -25,10 +25,10 @@ public class CameraFollow : MonoBehaviour
     public float zoomSmoothing = 4f;
     
     [Header("Boost Camera Effects")]
-    public float boostZoomDistance = 18f;     // Extra zoom back during boost
-    public float boostZoomSpeed = 8f;         // How fast camera zooms back
-    public float boostReturnSpeed = 3f;       // How fast camera returns to normal
-    public float boostFOVIncrease = 10f;      // Extra FOV during boost
+    public float boostZoomDistance = 18f;     
+    public float boostZoomSpeed = 8f;         
+    public float boostReturnSpeed = 3f;       
+    public float boostFOVIncrease = 10f;      
     
     [Header("Dynamic Camera")]
     public float maxSpeedFOV = 75f;
@@ -37,9 +37,9 @@ public class CameraFollow : MonoBehaviour
     [Header("Boost Post-Processing")]
     [Tooltip("Assign your Global Volume here")]
     public Volume postProcessVolume;
-    public float boostMotionBlur = 0.5f;        // Motion blur intensity during boost
-    public float boostLensDistortion = -0.3f;   // Lens distortion during boost (negative = barrel)
-    public float boostEffectSpeed = 5f;         // How fast effects transition
+    public float boostMotionBlur = 0.5f;        
+    public float boostLensDistortion = -0.3f;   
+    public float boostEffectSpeed = 5f;         
     
     [Header("Debug")]
     public bool showDebugInfo = false;
@@ -54,16 +54,13 @@ public class CameraFollow : MonoBehaviour
     private Vector3 currentOffset;
     private float currentDistance;
     
-    // Boost state
     private float boostDistanceModifier = 0f;
     private float boostFOVModifier = 0f;
     
-    // Water sinking effect
     private bool isFrozen = false;
     private Vector3 frozenPosition;
     private Quaternion frozenRotation;
     
-    // Post-processing effect references (only for boost effects)
     private MotionBlur motionBlurEffect;
     private LensDistortion lensDistortionEffect;
     
@@ -83,13 +80,11 @@ public class CameraFollow : MonoBehaviour
         currentOffset = offset;
         currentDistance = offset.magnitude;
         
-        // Initialize boost-specific post-processing effects
         InitializeBoostEffects();
     }
     
     void InitializeBoostEffects()
     {
-        // If no volume assigned, try to find one
         if (postProcessVolume == null)
         {
             postProcessVolume = FindFirstObjectByType<Volume>();
@@ -100,7 +95,6 @@ public class CameraFollow : MonoBehaviour
             }
         }
         
-        // If we still don't have a volume, we're done
         if (postProcessVolume == null)
         {
             if (showDebugInfo)
@@ -110,23 +104,20 @@ public class CameraFollow : MonoBehaviour
             return;
         }
         
-        // Make sure volume has a profile
         if (postProcessVolume.profile == null)
         {
             Debug.LogError("<color=red>[Camera]</color> Volume has no profile assigned!");
             return;
         }
         
-        // Try to get boost-specific effects from the volume profile
         bool hasMotionBlur = postProcessVolume.profile.TryGet(out motionBlurEffect);
         bool hasLensDistortion = postProcessVolume.profile.TryGet(out lensDistortionEffect);
         
-        // Initialize Motion Blur (if it exists)
         if (hasMotionBlur)
         {
-            // We'll control the intensity dynamically
+
             motionBlurEffect.intensity.overrideState = true;
-            currentMotionBlurIntensity = 0f; // Start at 0, only activate during boost
+            currentMotionBlurIntensity = 0f; 
             motionBlurEffect.intensity.value = 0f;
             
             if (showDebugInfo) 
@@ -137,12 +128,11 @@ public class CameraFollow : MonoBehaviour
             Debug.LogWarning("<color=yellow>[Camera]</color> Motion Blur not found in Volume Profile. Add it for boost blur effect!");
         }
         
-        // Initialize Lens Distortion (if it exists)
         if (hasLensDistortion)
         {
-            // We'll control the intensity dynamically
+
             lensDistortionEffect.intensity.overrideState = true;
-            currentLensDistortion = 0f; // Start at 0, only activate during boost
+            currentLensDistortion = 0f; 
             lensDistortionEffect.intensity.value = 0f;
             
             if (showDebugInfo) 
@@ -161,9 +151,6 @@ public class CameraFollow : MonoBehaviour
         }
     }
     
-    /// <summary>
-    /// Freezes the camera at its current position (for water sinking effect)
-    /// </summary>
     public void FreezeCamera()
     {
         isFrozen = true;
@@ -171,9 +158,6 @@ public class CameraFollow : MonoBehaviour
         frozenRotation = transform.rotation;
     }
     
-    /// <summary>
-    /// Unfreezes the camera to resume following the target
-    /// </summary>
     public void UnfreezeCamera()
     {
         isFrozen = false;
@@ -183,7 +167,6 @@ public class CameraFollow : MonoBehaviour
     {
         if (target == null) return;
         
-        // If camera is frozen (car sinking in water), don't update position
         if (isFrozen)
         {
             transform.position = frozenPosition;
@@ -194,14 +177,11 @@ public class CameraFollow : MonoBehaviour
         float speed = targetRb != null ? targetRb.linearVelocity.magnitude : 0f;
         bool isBoosting = vehicleController != null && vehicleController.IsBoosting();
         
-        // Handle boost camera zoom and effects
         UpdateBoostCamera(isBoosting);
         
-        // Calculate base distance from speed
         float speedFactor = Mathf.Clamp01(speed / speedForMaxZoom);
         float targetDistance = Mathf.Lerp(minDistance, maxDistance, speedFactor);
         
-        // Add boost distance modifier
         targetDistance += boostDistanceModifier;
         
         currentDistance = Mathf.Lerp(currentDistance, targetDistance, zoomSmoothing * Time.deltaTime);
@@ -237,7 +217,6 @@ public class CameraFollow : MonoBehaviour
         Quaternion targetRotation = Quaternion.LookRotation(lookDirection);
         transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSmoothing * Time.deltaTime);
         
-        // Dynamic FOV with boost modifier
         if (targetRb != null && cam != null)
         {
             float baseFOV = Mathf.Lerp(normalFOV, maxSpeedFOV, speed / 25f);
@@ -248,14 +227,11 @@ public class CameraFollow : MonoBehaviour
 
     void UpdateBoostCamera(bool isBoosting)
     {
-        // Smoothly adjust boost modifiers
         if (isBoosting)
         {
-            // Zoom back and increase FOV during boost
             boostDistanceModifier = Mathf.Lerp(boostDistanceModifier, boostZoomDistance - maxDistance, boostZoomSpeed * Time.deltaTime);
             boostFOVModifier = Mathf.Lerp(boostFOVModifier, boostFOVIncrease, boostZoomSpeed * Time.deltaTime);
             
-            // Apply boost visual effects (blur + distortion)
             if (effectsInitialized)
             {
                 ApplyBoostVisualEffects(true);
@@ -263,11 +239,9 @@ public class CameraFollow : MonoBehaviour
         }
         else
         {
-            // Return to normal slowly
             boostDistanceModifier = Mathf.Lerp(boostDistanceModifier, 0f, boostReturnSpeed * Time.deltaTime);
             boostFOVModifier = Mathf.Lerp(boostFOVModifier, 0f, boostReturnSpeed * Time.deltaTime);
             
-            // Return post-processing to normal (0)
             if (effectsInitialized)
             {
                 ApplyBoostVisualEffects(false);
@@ -279,7 +253,6 @@ public class CameraFollow : MonoBehaviour
     {
         float speed = boostEffectSpeed * Time.deltaTime;
         
-        // Motion Blur - only active during boost
         if (motionBlurEffect != null)
         {
             float targetBlur = isBoosting ? boostMotionBlur : 0f;
@@ -287,7 +260,6 @@ public class CameraFollow : MonoBehaviour
             motionBlurEffect.intensity.value = currentMotionBlurIntensity;
         }
         
-        // Lens Distortion - only active during boost
         if (lensDistortionEffect != null)
         {
             float targetDistortion = isBoosting ? boostLensDistortion : 0f;
@@ -296,7 +268,6 @@ public class CameraFollow : MonoBehaviour
         }
     }
     
-    // Helper method to manually reinitialize effects (useful if volume changes)
     [ContextMenu("Reinitialize Boost Effects")]
     public void ReinitializeBoostEffects()
     {

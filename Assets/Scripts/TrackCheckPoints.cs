@@ -33,7 +33,7 @@ public class TrackCheckPoints : MonoBehaviour
 
     private void Start()
     {
-        // Show the first two checkpoints at the start
+        // Show first two checkpoints at the start
         UpdateVisibleCheckpoints();
     }
     
@@ -56,12 +56,11 @@ public class TrackCheckPoints : MonoBehaviour
                 CompleteLap();
             }
             
-            // Update which checkpoints are visible
             UpdateVisibleCheckpoints();
 
             OnPlayerCorrectCheckpoint?.Invoke(this, EventArgs.Empty);
         }
-        else if ( checkpointIndex == nextCheckpointIndex - 1) //vazw apla else if gia na min emfanizei to wrong checkpoint message kai na epitrepoume ston player na pernaei apo idio checkpoint (gia fix sto respawn)  
+        else if ( checkpointIndex == nextCheckpointIndex - 1) 
         {
             Debug.Log($"Pased the same checkpoint ");
         }
@@ -83,7 +82,7 @@ public class TrackCheckPoints : MonoBehaviour
         // Check if race is complete
         if (currentLap > totalLaps)
         {
-            nextCheckpointIndex = checkpointSingleList.Count; // Set to out of bounds
+            nextCheckpointIndex = checkpointSingleList.Count; 
             FinishRace();
         }
     }
@@ -98,10 +97,8 @@ public class TrackCheckPoints : MonoBehaviour
 
     private void UpdateVisibleCheckpoints()
     {
-        // Don't update checkpoints if race is finished
         if (raceFinished || nextCheckpointIndex >= checkpointSingleList.Count)
         {
-            // Hide all checkpoints when race is finished
             foreach (var checkpoint in checkpointSingleList)
             {
                 checkpoint.Hide();
@@ -109,21 +106,17 @@ public class TrackCheckPoints : MonoBehaviour
             return;
         }
         
-        // Hide all checkpoints first
         foreach (var checkpoint in checkpointSingleList)
         {
             checkpoint.Hide();
         }
 
-        // Show next checkpoint
         checkpointSingleList[nextCheckpointIndex].Show();
 
-        // Show checkpoint after next (wrapping around if needed)
         int nextPlusOneIndex = (nextCheckpointIndex + 1) % checkpointSingleList.Count;
         checkpointSingleList[nextPlusOneIndex].Show();
     }
     
-    // Public getters
     public int GetNextCheckpointIndex() { return nextCheckpointIndex; }
     public int GetTotalCheckpoints() { return checkpointSingleList.Count; }
     public int GetCurrentLap() { return currentLap; }

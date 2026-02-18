@@ -10,7 +10,7 @@ public class VictoryScreenUI : MonoBehaviour
     [SerializeField] private GameObject victoryPanel;
     [SerializeField] private TextMeshProUGUI victoryText;
     [SerializeField] private CustomVehicleController vehicleController;
-    [SerializeField] private CameraFollow cameraFollow;  // ADD THIS
+    [SerializeField] private CameraFollow cameraFollow;  
     
     [Header("UI Elements to Hide")]
     [SerializeField] private GameObject lapCounterUI;
@@ -41,14 +41,12 @@ public class VictoryScreenUI : MonoBehaviour
     [Header("Scene Names")]
     public string mainMenuSceneName = "MainMenu";
     
-    // Store original positions
     private Vector2 titleOriginalPos;
     private Vector2 restartOriginalPos;
     private Vector2 mainMenuOriginalPos;
 
     private void Awake()
     {
-        // Store original positions for animations
         if (victoryTitle != null) titleOriginalPos = victoryTitle.anchoredPosition;
         if (restartButton != null) restartOriginalPos = restartButton.anchoredPosition;
         if (mainMenuButton != null) mainMenuOriginalPos = mainMenuButton.anchoredPosition;
@@ -58,7 +56,6 @@ public class VictoryScreenUI : MonoBehaviour
     {
         trackCheckPoints.OnRaceFinished += ShowVictoryScreen;
         
-        // Hide victory screen at start
         if (victoryPanel != null)
         {
             victoryPanel.SetActive(false);
@@ -67,7 +64,6 @@ public class VictoryScreenUI : MonoBehaviour
 
     private void ShowVictoryScreen(object sender, System.EventArgs e)
     {
-        // Show victory panel
         if (victoryPanel != null)
         {
             victoryPanel.SetActive(true);
@@ -78,19 +74,16 @@ public class VictoryScreenUI : MonoBehaviour
             victoryText.text = "RACE COMPLETE!\n\nYOU WIN!";
         }
 
-        // Disable vehicle controls
         if (vehicleController != null)
         {
             vehicleController.enabled = false;
         }
         
-        // Disable camera mouse look so UI can receive clicks
         if (cameraFollow != null)
         {
             cameraFollow.enabled = false;
         }
         
-        // Show cursor for UI interaction
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
         
@@ -98,7 +91,6 @@ public class VictoryScreenUI : MonoBehaviour
         Debug.Log($"[VictoryScreen] Vehicle enabled: {(vehicleController != null ? vehicleController.enabled : false)}");
         Debug.Log($"[VictoryScreen] Cursor visible: {Cursor.visible}, lockState: {Cursor.lockState}");
         
-        // Check EventSystem
         UnityEngine.EventSystems.EventSystem eventSystem = UnityEngine.EventSystems.EventSystem.current;
         if (eventSystem == null)
         {
@@ -109,13 +101,10 @@ public class VictoryScreenUI : MonoBehaviour
             Debug.Log($"[VictoryScreen] EventSystem found: {eventSystem.gameObject.name}");
         }
         
-        // Hide all racing UI elements
         HideRacingUI();
         
-        // Hide checkpoint visuals on track
         HideCheckpoints();
         
-        // Start victory screen animations
         StartCoroutine(AnimateVictoryScreen());
     }
 
@@ -150,14 +139,13 @@ public class VictoryScreenUI : MonoBehaviour
         }
     }
     
-    // ========== ANIMATION SYSTEM ==========
+    // ANIMATION SYSTEM 
     
     IEnumerator AnimateVictoryScreen()
     {
         // Hide elements off-screen initially
         HideUIElements();
         
-        // Wait initial delay
         yield return new WaitForSeconds(titleDelay);
         
         // Animate title dropping from top
@@ -166,10 +154,8 @@ public class VictoryScreenUI : MonoBehaviour
             StartCoroutine(AnimateTitle());
         }
         
-        // Wait before buttons
         yield return new WaitForSeconds(buttonStartDelay);
         
-        // Animate buttons with stagger
         if (restartButton != null)
         {
             StartCoroutine(AnimateButton(restartButton, restartOriginalPos, 0f));
@@ -185,13 +171,11 @@ public class VictoryScreenUI : MonoBehaviour
     
     void HideUIElements()
     {
-        // Hide title above screen
         if (victoryTitle != null)
         {
             victoryTitle.anchoredPosition = titleOriginalPos + new Vector2(0f, titleDropDistance);
         }
         
-        // Hide buttons below screen
         HideButton(restartButton, restartOriginalPos);
         HideButton(mainMenuButton, mainMenuOriginalPos);
     }
@@ -200,22 +184,18 @@ public class VictoryScreenUI : MonoBehaviour
     {
         if (button == null) return;
         
-        // Position below
         button.anchoredPosition = originalPos + new Vector2(0f, -buttonSlideDistance);
         
-        // Get or add CanvasGroup for fade animation
         CanvasGroup canvasGroup = button.GetComponent<CanvasGroup>();
         if (canvasGroup == null)
         {
             canvasGroup = button.gameObject.AddComponent<CanvasGroup>();
         }
         
-        // Make transparent and non-interactive during animation
         canvasGroup.alpha = 0f;
         canvasGroup.interactable = false;
         canvasGroup.blocksRaycasts = false;
         
-        // Ensure Button component exists and is enabled
         Button buttonComponent = button.GetComponent<Button>();
         if (buttonComponent != null)
         {
@@ -225,7 +205,7 @@ public class VictoryScreenUI : MonoBehaviour
     
     IEnumerator AnimateTitle()
     {
-        // Start position (above screen)
+        // Start position 
         Vector2 startPos = titleOriginalPos + new Vector2(0f, titleDropDistance);
         
         victoryTitle.anchoredPosition = startPos;
@@ -250,10 +230,8 @@ public class VictoryScreenUI : MonoBehaviour
     {
         yield return new WaitForSeconds(delay);
         
-        // Get starting position (already set in HideUIElements)
         Vector2 startPos = button.anchoredPosition;
         
-        // Get canvas group (already added in HideUIElements)
         CanvasGroup canvasGroup = button.GetComponent<CanvasGroup>();
         
         float elapsed = 0f;
@@ -264,22 +242,18 @@ public class VictoryScreenUI : MonoBehaviour
             float t = elapsed / buttonDuration;
             float curvedT = buttonEase.Evaluate(t);
             
-            // Slide up
             button.anchoredPosition = Vector2.Lerp(startPos, targetPos, curvedT);
             
-            // Fade in
             canvasGroup.alpha = curvedT;
             
             yield return null;
         }
         
-        // Ensure final position and alpha
         button.anchoredPosition = targetPos;
         canvasGroup.alpha = 1f;
         canvasGroup.interactable = true;
         canvasGroup.blocksRaycasts = true;
         
-        // Also ensure the Button component itself is interactable
         Button buttonComponent = button.GetComponent<Button>();
         if (buttonComponent != null)
         {
@@ -291,7 +265,6 @@ public class VictoryScreenUI : MonoBehaviour
             Debug.LogWarning($"[VictoryScreen] Button {button.name} has NO Button component!");
         }
         
-        // Check if any parent CanvasGroups might be blocking
         CanvasGroup[] parentGroups = button.GetComponentsInParent<CanvasGroup>();
         Debug.Log($"[VictoryScreen] Button {button.name} has {parentGroups.Length} CanvasGroups in parents");
         foreach (var group in parentGroups)
@@ -302,12 +275,8 @@ public class VictoryScreenUI : MonoBehaviour
         Debug.Log($"[VictoryScreen] Button {button.name} animation complete - CanvasGroup interactable: {canvasGroup.interactable}, blocksRaycasts: {canvasGroup.blocksRaycasts}");
     }
     
-    // ========== BUTTON HANDLERS ==========
-    
-    /// <summary>
-    /// Restart the current race track
-    /// Call this from Restart Button's OnClick event
-    /// </summary>
+    // BUTTON HANDLERS
+ 
     public void OnRestartButton()
     {
         Debug.Log("[VictoryScreen] Restart button clicked");
@@ -319,15 +288,10 @@ public class VictoryScreenUI : MonoBehaviour
         LoadingScreen.LoadScene(currentSceneName);
     }
     
-    /// <summary>
-    /// Return to main menu
-    /// Call this from Main Menu Button's OnClick event
-    /// </summary>
     public void OnMainMenuButton()
     {
         Debug.Log("[VictoryScreen] Main Menu button clicked");
         
-        // Use LoadingScreen for smooth transition
         LoadingScreen.LoadScene(mainMenuSceneName);
     }
 

@@ -17,7 +17,7 @@ public class SettingsMenu : MonoBehaviour
         LoadSettings();
     }
     
-    // ===== AUDIO =====
+    // AUDIO 
     public void OnMasterVolumeChanged(float value)
     {
         AudioListener.volume = value;
@@ -26,17 +26,17 @@ public class SettingsMenu : MonoBehaviour
     
     public void OnMusicVolumeChanged(float value)
     {
-        // You can implement music-specific volume here later
+
         PlayerPrefs.SetFloat("MusicVolume", value);
     }
     
     public void OnSFXVolumeChanged(float value)
     {
-        // You can implement SFX-specific volume here later
+
         PlayerPrefs.SetFloat("SFXVolume", value);
     }
     
-    // ===== GRAPHICS =====
+    // GRAPHICS
     public void OnFullscreenToggled(bool isFullscreen)
     {
         Screen.fullScreen = isFullscreen;
@@ -49,10 +49,9 @@ public class SettingsMenu : MonoBehaviour
         PlayerPrefs.SetInt("Quality", qualityIndex);
     }
     
-    // ===== LOAD/SAVE =====
+    // LOAD/SAVE
     void LoadSettings()
     {
-        // Audio
         float masterVol = PlayerPrefs.GetFloat("MasterVolume", 1f);
         float musicVol = PlayerPrefs.GetFloat("MusicVolume", 0.7f);
         float sfxVol = PlayerPrefs.GetFloat("SFXVolume", 0.8f);
@@ -63,7 +62,6 @@ public class SettingsMenu : MonoBehaviour
         
         AudioListener.volume = masterVol;
         
-        // Graphics
         bool fullscreen = PlayerPrefs.GetInt("Fullscreen", 1) == 1;
         int quality = PlayerPrefs.GetInt("Quality", QualitySettings.GetQualityLevel());
         

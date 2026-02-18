@@ -12,7 +12,7 @@ public class MainMenu : MonoBehaviour
     public string track3SceneName = "Track3";
     public string track4SceneName = "Track4";
     
-    // ===== MAIN MENU BUTTONS =====
+    // MAIN MENU BUTTONS 
     public void OnPlayButton()
     {
         if (animationController != null)
@@ -38,7 +38,7 @@ public class MainMenu : MonoBehaviour
         #endif
     }
     
-    // ===== TRACK SELECTION BUTTONS =====
+    // TRACK SELECTION BUTTONS 
     public void OnTrack1Button()
     {
         if (!string.IsNullOrEmpty(track1SceneName))
@@ -87,7 +87,7 @@ public class MainMenu : MonoBehaviour
         }
     }
     
-    // ===== BACK BUTTONS =====
+    // BACK BUTTONS
     public void OnBackFromTracks()
     {
         if (animationController != null)

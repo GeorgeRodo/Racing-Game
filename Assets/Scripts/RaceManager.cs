@@ -9,16 +9,16 @@ public class RaceManager : MonoBehaviour
 
     [Header("Audio Settings")]
     public AudioSource raceMusic;
-    public AudioSource sfxSource;  // Single AudioSource for all sound effects
+    public AudioSource sfxSource;  
     
     [Header("Music Boost Effect")]
-    public float normalMusicPitch = 1f;      // Normal music speed
-    public float boostMusicPitch = 1.15f;    // Music speed during boost (15% faster)
-    public float musicPitchTransitionSpeed = 3f;  // How fast pitch changes
+    public float normalMusicPitch = 1f;     
+    public float boostMusicPitch = 1.15f;   
+    public float musicPitchTransitionSpeed = 3f;  
     
     [Header("Countdown Sound Clips")]
-    public AudioClip countdownBeep;   // Sound for 3, 2, 1 (same sound plays 3 times)
-    public AudioClip goSound;          // Sound for GO!
+    public AudioClip countdownBeep;  
+    public AudioClip goSound;         
 
     [Header("Vehicle Reference")]
     public CustomVehicleController vehicleController;
@@ -27,25 +27,24 @@ public class RaceManager : MonoBehaviour
     public TrackCheckPoints trackCheckPoints;
     
     [Header("Timing Settings")]
-    public float startupIdleDuration = 5f;  // Time to idle before countdown
-    public float countdownInterval = 1f;    // Time between 3, 2, 1 (increase if sound is long)
+    public float startupIdleDuration = 5f;
+    public float countdownInterval = 1f;   
     
     [Header("UI Animation")]
-    public RectTransform lapCounterUI;          // Lap counter UI element
-    public RectTransform checkpointCounterUI;   // Checkpoint counter UI element
-    public float uiSlideInDuration = 0.8f;      // How long the slide animation takes
-    public float uiSlideInDelay = 0.5f;         // Delay before UI slides in after GO
-    public float uiOffsetDistance = 100f;       // How far to move UI off-screen (pixels)
+    public RectTransform lapCounterUI;         
+    public RectTransform checkpointCounterUI;   
+    public float uiSlideInDuration = 0.8f;      
+    public float uiSlideInDelay = 0.5f;         
+    public float uiOffsetDistance = 100f;       
     
     [Header("Countdown Animation")]
-    public float countdownDropDistance = 200f;  // How far above screen countdown starts
-    public float countdownDropDuration = 0.3f;  // How fast countdown drops down
-    public float countdownBounce = 20f;         // Bounce overshoot amount
+    public float countdownDropDistance = 200f;  
+    public float countdownDropDuration = 0.3f;  
+    public float countdownBounce = 20f;         
 
     private bool raceStarted = false;
     private float raceTime = 0f;
     
-    // Store original positions
     private Vector2 lapOriginalPos;
     private Vector2 checkpointOriginalPos;
     private Vector2 countdownOriginalPos;
@@ -58,22 +57,18 @@ public class RaceManager : MonoBehaviour
             countdownText.gameObject.SetActive(true);
             countdownRectTransform = countdownText.GetComponent<RectTransform>();
             
-            // Store original position and hide off-screen
             if (countdownRectTransform != null)
             {
                 countdownOriginalPos = countdownRectTransform.anchoredPosition;
             }
         }
 
-        // Disable vehicle controls until race starts
         if (vehicleController != null)
             vehicleController.enabled = false;
 
-        // Stop race music until countdown finishes
         if (raceMusic != null)
             raceMusic.Stop();
         
-        // Hide UI elements during countdown
         HideRaceUI();
 
         StartCoroutine(StartupSequence());
@@ -81,7 +76,6 @@ public class RaceManager : MonoBehaviour
     
     void HideRaceUI()
     {
-        // Store original positions and move UI off-screen
         if (lapCounterUI != null)
         {
             lapCounterUI.gameObject.SetActive(true);
@@ -99,7 +93,6 @@ public class RaceManager : MonoBehaviour
             checkpointCounterUI.anchoredPosition = new Vector2(checkpointOriginalPos.x + uiOffsetDistance, checkpointOriginalPos.y);
             Debug.Log($"[CHECKPOINT] Hidden pos: {checkpointCounterUI.anchoredPosition}");
             
-            // Force rebuild layout to prevent teleporting
             UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(checkpointCounterUI);
         }
     }
@@ -111,7 +104,6 @@ public class RaceManager : MonoBehaviour
             raceTime += Time.deltaTime;
         }
         
-        // Update music pitch based on boost state
         UpdateMusicPitch();
     }
     
@@ -119,13 +111,10 @@ public class RaceManager : MonoBehaviour
     {
         if (raceMusic == null || vehicleController == null) return;
         
-        // Check if vehicle is boosting
         bool isBoosting = vehicleController.IsBoosting();
         
-        // Target pitch based on boost state
         float targetPitch = isBoosting ? boostMusicPitch : normalMusicPitch;
         
-        // Smoothly transition to target pitch
         raceMusic.pitch = Mathf.Lerp(
             raceMusic.pitch, 
             targetPitch, 
@@ -135,7 +124,6 @@ public class RaceManager : MonoBehaviour
 
     IEnumerator StartupSequence()
     {
-        // Show "GET READY" or engine warming up message
         if (countdownText != null)
         {
             countdownText.text = "GET READY";
@@ -143,16 +131,14 @@ public class RaceManager : MonoBehaviour
             countdownText.fontSize = 80;
         }
         
-        // Wait for startup/idle duration (car engine sounds play during this)
         yield return new WaitForSeconds(startupIdleDuration);
         
-        // Now start the countdown
         StartCoroutine(CountdownSequence());
     }
 
     IEnumerator CountdownSequence()
     {
-        // Countdown: 3, 2, 1 (plays same beep sound for each)
+        // Countdown: 3, 2, 1 
         for (int i = 3; i > 0; i--)
         {
             if (countdownText != null)
@@ -162,20 +148,17 @@ public class RaceManager : MonoBehaviour
                 countdownText.fontSize = 120;
             }
             
-            // Animate countdown drop in
             StartCoroutine(AnimateCountdownDrop());
             
-            // Stop any previous countdown sound and play new one
             if (sfxSource != null && countdownBeep != null)
             {
-                sfxSource.Stop(); // Stop previous sound
+                sfxSource.Stop(); 
                 sfxSource.PlayOneShot(countdownBeep);
             }
             
             yield return new WaitForSeconds(countdownInterval);
         }
 
-        // GO!
         if (countdownText != null)
         {
             countdownText.text = "GO!";
@@ -183,10 +166,8 @@ public class RaceManager : MonoBehaviour
             countdownText.fontSize = 140;
         }
         
-        // Animate GO! drop in (bigger!)
         StartCoroutine(AnimateCountdownDrop());
         
-        // Play GO! sound (different from countdown)
         if (sfxSource != null && goSound != null)
         {
             sfxSource.PlayOneShot(goSound);
@@ -199,7 +180,6 @@ public class RaceManager : MonoBehaviour
         if (countdownText != null)
             countdownText.gameObject.SetActive(false);
         
-        // Start UI slide-in animation
         yield return new WaitForSeconds(uiSlideInDelay);
         StartCoroutine(SlideInUI());
     }
@@ -208,14 +188,12 @@ public class RaceManager : MonoBehaviour
     {
         raceStarted = true;
 
-        // Start race music
         if (raceMusic != null)
         {
-            raceMusic.pitch = normalMusicPitch; // Set to normal pitch
+            raceMusic.pitch = normalMusicPitch; 
             raceMusic.Play();
         }
 
-        // Enable vehicle controls
         if (vehicleController != null)
             vehicleController.enabled = true;
     }
@@ -227,31 +205,26 @@ public class RaceManager : MonoBehaviour
     {
         if (countdownRectTransform == null) yield break;
         
-        // Start position (above screen)
         Vector2 startPos = countdownOriginalPos + new Vector2(0f, countdownDropDistance);
         
-        // Overshoot position (slightly below final position)
         Vector2 overshootPos = countdownOriginalPos - new Vector2(0f, countdownBounce);
         
         countdownRectTransform.anchoredPosition = startPos;
         
         float elapsed = 0f;
         
-        // Phase 1: Drop down with overshoot (70% of duration)
         float phase1Duration = countdownDropDuration * 0.7f;
         while (elapsed < phase1Duration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / phase1Duration;
             
-            // Ease in (accelerate as it falls)
             float curvedT = t * t;
             
             countdownRectTransform.anchoredPosition = Vector2.Lerp(startPos, overshootPos, curvedT);
             yield return null;
         }
         
-        // Phase 2: Bounce back to final position (30% of duration)
         float phase2Duration = countdownDropDuration * 0.3f;
         elapsed = 0f;
         
@@ -260,24 +233,20 @@ public class RaceManager : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = elapsed / phase2Duration;
             
-            // Ease out (decelerate as it settles)
             float curvedT = Mathf.Sin(t * Mathf.PI * 0.5f);
             
             countdownRectTransform.anchoredPosition = Vector2.Lerp(overshootPos, countdownOriginalPos, curvedT);
             yield return null;
         }
         
-        // Ensure final position is exact
         countdownRectTransform.anchoredPosition = countdownOriginalPos;
     }
     
     IEnumerator SlideInUI()
     {
-        // Disable any layout groups that might interfere
         var lapLayoutGroups = lapCounterUI != null ? lapCounterUI.GetComponents<UnityEngine.UI.LayoutGroup>() : null;
         var checkpointLayoutGroups = checkpointCounterUI != null ? checkpointCounterUI.GetComponents<UnityEngine.UI.LayoutGroup>() : null;
         
-        // Disable layout groups temporarily
         if (lapLayoutGroups != null)
             foreach (var layout in lapLayoutGroups) layout.enabled = false;
         if (checkpointLayoutGroups != null)
@@ -285,39 +254,32 @@ public class RaceManager : MonoBehaviour
         
         float elapsed = 0f;
         
-        // Store starting positions (currently off-screen)
         Vector2 lapStartPos = lapCounterUI != null ? lapCounterUI.anchoredPosition : Vector2.zero;
         Vector2 checkpointStartPos = checkpointCounterUI != null ? checkpointCounterUI.anchoredPosition : Vector2.zero;
         
-        // IMPORTANT: Store target positions separately (don't reuse the same variable!)
         Vector2 lapTargetPos = lapOriginalPos;
         Vector2 checkpointTargetPos = checkpointOriginalPos;
         
-        Debug.Log($"=== ANIMATION START ===");
-        Debug.Log($"Lap: {lapStartPos} → {lapTargetPos}");
-        Debug.Log($"Checkpoint: {checkpointStartPos} → {checkpointTargetPos}");
+        Debug.Log($"ANIMATION START");
+        Debug.Log($"Lap: {lapStartPos} -> {lapTargetPos}");
+        Debug.Log($"Checkpoint: {checkpointStartPos} -> {checkpointTargetPos}");
         
         while (elapsed < uiSlideInDuration)
         {
             elapsed += Time.deltaTime;
             float t = elapsed / uiSlideInDuration;
             
-            // Smooth easing (ease out)
             float smoothT = 1f - Mathf.Pow(1f - t, 3f);
             
-            // Animate lap counter
             if (lapCounterUI != null)
             {
                 lapCounterUI.anchoredPosition = Vector2.Lerp(lapStartPos, lapTargetPos, smoothT);
             }
             
-            // Animate checkpoint counter WITHOUT delay (remove the stagger that causes it to stop early)
             if (checkpointCounterUI != null)
             {
-                // Use same t as lap counter, but we can add delay before starting if needed
                 checkpointCounterUI.anchoredPosition = Vector2.Lerp(checkpointStartPos, checkpointTargetPos, smoothT);
                 
-                // Debug every 10 frames to avoid spam
                 if (Time.frameCount % 10 == 0)
                 {
                     Debug.Log($"[CHECKPOINT] t={smoothT:F2} | pos={checkpointCounterUI.anchoredPosition} | target={checkpointTargetPos}");
@@ -327,9 +289,8 @@ public class RaceManager : MonoBehaviour
             yield return null;
         }
         
-        Debug.Log($"=== ANIMATION END ===");
+        Debug.Log($"ANIMATION END");
         
-        // Ensure final positions are exact (back to original)
         if (lapCounterUI != null)
         {
             lapCounterUI.anchoredPosition = lapTargetPos;
@@ -342,7 +303,6 @@ public class RaceManager : MonoBehaviour
             Debug.Log($"Checkpoint final: {checkpointCounterUI.anchoredPosition}");
         }
         
-        // Re-enable layout groups
         if (lapLayoutGroups != null)
             foreach (var layout in lapLayoutGroups) layout.enabled = true;
         if (checkpointLayoutGroups != null)

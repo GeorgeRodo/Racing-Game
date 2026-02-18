@@ -12,8 +12,8 @@ public class PlayerRespawn : MonoBehaviour
     [Tooltip("Starting position if no checkpoint has been passed yet")]
     public Transform defaultSpawnPoint;
     public float respawnDelay = 0.5f;
-    public float spawnHeightOffset = 1f;      // Height above checkpoint
-    public float spawnDistanceBehind = 5f;    // Distance behind checkpoint
+    public float spawnHeightOffset = 1f;      
+    public float spawnDistanceBehind = 5f;    
 
     [Header("UI Fade Settings")]
     public Image fadeImage; 
@@ -33,7 +33,6 @@ public class PlayerRespawn : MonoBehaviour
     private CustomVehicleController vehicleController;
     private bool isRespawning = false;
     
-    // Track the last valid checkpoint
     private Transform lastValidCheckpoint;
 
     void Start()
@@ -41,7 +40,6 @@ public class PlayerRespawn : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         vehicleController = GetComponent<CustomVehicleController>();
         
-        // Subscribe to checkpoint events
         if (trackCheckPoints != null)
         {
             trackCheckPoints.OnPlayerCorrectCheckpoint += TrackCheckPoints_OnPlayerCorrectCheckpoint;
@@ -51,7 +49,6 @@ public class PlayerRespawn : MonoBehaviour
             Debug.LogWarning("[PlayerRespawn] TrackCheckPoints reference not set! Respawn will use default spawn point.");
         }
         
-        // Set initial spawn point
         if (defaultSpawnPoint == null)
         {
             Debug.LogWarning("[PlayerRespawn] No default spawn point set! Using current position.");
@@ -65,7 +62,6 @@ public class PlayerRespawn : MonoBehaviour
 
     private void OnDestroy()
     {
-        // Unsubscribe from events
         if (trackCheckPoints != null)
         {
             trackCheckPoints.OnPlayerCorrectCheckpoint -= TrackCheckPoints_OnPlayerCorrectCheckpoint;
@@ -74,16 +70,13 @@ public class PlayerRespawn : MonoBehaviour
 
     private void TrackCheckPoints_OnPlayerCorrectCheckpoint(object sender, System.EventArgs e)
     {
-        // Get the checkpoint that was just passed
         int lastCheckpointIndex = trackCheckPoints.GetNextCheckpointIndex() - 1;
         
-        // Handle wrap-around (if we just completed a lap, go to last checkpoint)
         if (lastCheckpointIndex < 0)
         {
             lastCheckpointIndex = trackCheckPoints.GetTotalCheckpoints() - 1;
         }
         
-        // Get the checkpoint transform from the TrackCheckPoints parent
         if (lastCheckpointIndex >= 0 && lastCheckpointIndex < trackCheckPoints.transform.childCount)
         {
             Transform checkpointTransform = trackCheckPoints.transform.GetChild(lastCheckpointIndex);
@@ -98,7 +91,6 @@ public class PlayerRespawn : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        // Only handle water collision, checkpoints are handled by the event system
         if (other.CompareTag("Water") && !isRespawning)
         {
             if (showDebugInfo)
@@ -106,7 +98,7 @@ public class PlayerRespawn : MonoBehaviour
                 Debug.Log($"[PlayerRespawn] Hit water! Respawning to: {lastValidCheckpoint.name}");
             }
             
-            // Immediately disable vehicle controller to stop driving
+            // Disable vehicle controller to stop driving
             if (vehicleController != null)
             {
                 vehicleController.enabled = false;
@@ -127,13 +119,11 @@ public class PlayerRespawn : MonoBehaviour
     {
         isRespawning = true;
         
-        // Freeze camera to watch car sink
         if (cameraFollow != null)
         {
             cameraFollow.FreezeCamera();
         }
 
-        // Fade to black
         float alpha = 0;
         while (alpha < 1)
         {
@@ -142,20 +132,16 @@ public class PlayerRespawn : MonoBehaviour
             yield return null;
         }
 
-        // Calculate spawn position behind the last checkpoint
         Vector3 spawnPosition = lastValidCheckpoint.position 
             - (lastValidCheckpoint.forward * spawnDistanceBehind) 
             + (Vector3.up * spawnHeightOffset);
         
-        // Teleport vehicle
         transform.position = spawnPosition;
         transform.rotation = lastValidCheckpoint.rotation;
 
-        // Ensure physics are reset
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
         
-        // Force physics update
         Physics.SyncTransforms();
 
         yield return new WaitForSeconds(respawnDelay);
@@ -166,13 +152,11 @@ public class PlayerRespawn : MonoBehaviour
             vehicleController.enabled = true;
         }
         
-        // Unfreeze camera
         if (cameraFollow != null)
         {
             cameraFollow.UnfreezeCamera();
         }
 
-        // Fade back in
         while (alpha > 0)
         {
             alpha -= Time.deltaTime * fadeSpeed;
@@ -198,7 +182,6 @@ public class PlayerRespawn : MonoBehaviour
         }
     }
     
-    // Manual respawn method (can be called from code or UI button)
     public void ManualRespawn()
     {
         if (!isRespawning)
@@ -207,7 +190,6 @@ public class PlayerRespawn : MonoBehaviour
         }
     }
     
-    // Get current respawn point (for debugging or other systems)
     public Transform GetCurrentRespawnPoint()
     {
         return lastValidCheckpoint;

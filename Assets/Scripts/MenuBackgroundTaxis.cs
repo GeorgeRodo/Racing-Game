@@ -1,30 +1,25 @@
 using UnityEngine;
 
-/// <summary>
-/// Spawns taxis that drive straight across the screen from random edges
-/// Perfect for animated menu backgrounds with top-down camera
-/// </summary>
 public class MenuBackgroundTaxis : MonoBehaviour
 {
     [Header("Taxi Settings")]
     public GameObject taxiPrefab;
     
     [Header("Spawn Settings")]
-    public float spawnInterval = 1.5f;        // How often taxis appear (lower = more chaos!)
-    public int maxTaxis = 20;                 // Maximum taxis on screen at once
-    public float taxiLifetime = 15f;          // How long before taxi despawns
-    
+    public float spawnInterval = 1.5f;       
+    public int maxTaxis = 20;                
+    public float taxiLifetime = 15f;         
     [Header("Speed Settings")]
-    public float minSpeed = 8f;               // Minimum taxi speed
-    public float maxSpeed = 15f;              // Maximum taxi speed
+    public float minSpeed = 8f;              
+    public float maxSpeed = 15f;             
     
     [Header("Height Variation")]
-    public float minHeight = 0f;              // Minimum Y position
-    public float maxHeight = 2f;              // Maximum Y position (for stacked effect)
+    public float minHeight = 0f;             
+    public float maxHeight = 2f;             
     
     [Header("Camera Reference")]
-    public Camera backgroundCamera;           // Top-down camera
-    public float spawnDistance = 0.5f;        // How far outside camera view to spawn (very tight!)
+    public Camera backgroundCamera;          
+    public float spawnDistance = 0.5f;       
     
     private float spawnTimer = 0f;
     private int currentTaxiCount = 0;
@@ -33,31 +28,22 @@ public class MenuBackgroundTaxis : MonoBehaviour
     
     void Start()
     {
-        // Calculate camera view bounds based on actual camera setup
         if (backgroundCamera != null)
-        {
-            // Camera is at (0, 50, -94.8) looking down
-            // Your visible area block: Size (126, 7.7, 71.4) at position (391, -3.9, -87)
-            // This means the camera sees approximately:
-            // Width (X): ±63 units from center (126/2)
-            // Height (Z): ±35.7 units from camera Z position (71.4/2)
-            
-            // But let's also calculate from camera FOV for accuracy
+        {                    
             float cameraHeight = backgroundCamera.transform.position.y;
             float calculatedViewHeight = 2f * cameraHeight * Mathf.Tan(backgroundCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
             float calculatedViewWidth = calculatedViewHeight * backgroundCamera.aspect;
             
-            // Use your actual measured area (more accurate!)
-            cameraViewWidth = 126f;   // Your block width
-            cameraViewHeight = 71.4f; // Your block depth (Z dimension)
+            cameraViewWidth = 126f;   
+            cameraViewHeight = 71.4f; 
             
-            Debug.Log($"📷 Camera at: {backgroundCamera.transform.position}");
-            Debug.Log($"📏 Using measured view area: {cameraViewWidth:F1} x {cameraViewHeight:F1} units");
-            Debug.Log($"📐 Calculated from FOV: {calculatedViewWidth:F1} x {calculatedViewHeight:F1} units");
+            Debug.Log($"Camera at: {backgroundCamera.transform.position}");
+            Debug.Log($"Using measured view area: {cameraViewWidth:F1} x {cameraViewHeight:F1} units");
+            Debug.Log($"Calculated from FOV: {calculatedViewWidth:F1} x {calculatedViewHeight:F1} units");
         }
         else
         {
-            Debug.LogError("❌ Background camera not assigned!");
+            Debug.LogError("Background camera not assigned!");
             cameraViewWidth = 126f;
             cameraViewHeight = 71.4f;
         }
@@ -78,59 +64,50 @@ public class MenuBackgroundTaxis : MonoBehaviour
     {
         if (taxiPrefab == null)
         {
-            Debug.LogError("❌ No taxi prefab assigned!");
+            Debug.LogError("No taxi prefab assigned!");
             return;
         }
         
         currentTaxiCount++;
         
-        // Create taxi
         GameObject taxi = Instantiate(taxiPrefab, Vector3.zero, Quaternion.identity, transform);
         taxi.name = $"Taxi_{Random.Range(1000, 9999)}";
         
-        // Disable physics (we control movement manually)
         Rigidbody rb = taxi.GetComponent<Rigidbody>();
         if (rb != null) rb.isKinematic = true;
         
-        // Disable vehicle controller
         var controller = taxi.GetComponent<CustomVehicleController>();
         if (controller != null) controller.enabled = false;
         
-        // Choose a predetermined route pattern
-        int routePattern = Random.Range(0, 3); // 0=Row, 1=S-Shape, 2=Backwards
+        int routePattern = Random.Range(0, 3); 
         
         switch (routePattern)
         {
-            case 0: // Row - straight line across
+            case 0: 
                 AddRowRoute(taxi);
                 break;
-            case 1: // S-Shape - weaving pattern
+            case 1: 
                 AddSShapeRoute(taxi);
                 break;
-            case 2: // Backwards - driving in reverse
+            case 2: 
                 AddBackwardsRoute(taxi);
                 break;
         }
         
-        // Auto-destroy after lifetime
         Destroy(taxi, taxiLifetime);
         StartCoroutine(DecrementCountAfterDelay());
     }
     
     void AddRowRoute(GameObject taxi)
     {
-        // Straight line across the screen
         var mover = taxi.AddComponent<StraightDrivingTaxi>();
         
-        // Choose random edge
         int edge = Random.Range(0, 4);
         
-        // Camera is at Z=-94.8, visible area is centered there
         float cameraZOffset = backgroundCamera != null ? backgroundCamera.transform.position.z : -94.8f;
         
-        // Spawn bounds based on actual visible area
-        float halfWidth = (cameraViewWidth / 2f);   // ±63 units in X
-        float halfHeight = (cameraViewHeight / 2f);  // ±35.7 units in Z from camera position
+        float halfWidth = (cameraViewWidth / 2f);   
+        float halfHeight = (cameraViewHeight / 2f); 
         
         float randomHeight = Random.Range(minHeight, maxHeight);
         
@@ -139,7 +116,7 @@ public class MenuBackgroundTaxis : MonoBehaviour
         
         switch (edge)
         {
-            case 0: // Left → Right
+            case 0: // Left Right
                 spawnPos = new Vector3(
                     -halfWidth - spawnDistance, 
                     randomHeight, 
@@ -148,7 +125,7 @@ public class MenuBackgroundTaxis : MonoBehaviour
                 direction = Vector3.right;
                 break;
                 
-            case 1: // Right → Left
+            case 1: // Right Left
                 spawnPos = new Vector3(
                     halfWidth + spawnDistance, 
                     randomHeight, 
@@ -157,22 +134,22 @@ public class MenuBackgroundTaxis : MonoBehaviour
                 direction = Vector3.left;
                 break;
                 
-            case 2: // Top → Bottom (far Z)
+            case 2: // Top Bottom 
                 spawnPos = new Vector3(
                     Random.Range(-halfWidth + 5f, halfWidth - 5f), 
                     randomHeight, 
                     cameraZOffset - halfHeight - spawnDistance
                 );
-                direction = Vector3.forward; // Toward camera (positive Z)
+                direction = Vector3.forward; 
                 break;
                 
-            case 3: // Bottom → Top (near Z)
+            case 3: // Bottom Top 
                 spawnPos = new Vector3(
                     Random.Range(-halfWidth + 5f, halfWidth - 5f), 
                     randomHeight, 
                     cameraZOffset + halfHeight + spawnDistance
                 );
-                direction = Vector3.back; // Away from camera (negative Z)
+                direction = Vector3.back; 
                 break;
         }
         
@@ -186,14 +163,14 @@ public class MenuBackgroundTaxis : MonoBehaviour
     
     void AddSShapeRoute(GameObject taxi)
     {
-        // S-shaped weaving pattern
+        // S-shape
         var mover = taxi.AddComponent<SShapeTaxi>();
         
         float cameraZOffset = backgroundCamera != null ? backgroundCamera.transform.position.z : -94.8f;
         float halfHeight = (cameraViewHeight / 2f);
         float randomHeight = Random.Range(minHeight, maxHeight);
         
-        // Spawn from bottom (near camera), move away
+        // Spawn from bottom 
         mover.transform.position = new Vector3(
             Random.Range(-10f, 10f), 
             randomHeight, 
@@ -280,9 +257,6 @@ public class MenuBackgroundTaxis : MonoBehaviour
     }
 }
 
-/// <summary>
-/// Taxi drives in a straight line (Row pattern)
-/// </summary>
 public class StraightDrivingTaxi : MonoBehaviour
 {
     [HideInInspector] public Vector3 direction;
@@ -302,9 +276,6 @@ public class StraightDrivingTaxi : MonoBehaviour
     }
 }
 
-/// <summary>
-/// Taxi drives in an S-shape pattern (weaving side to side)
-/// </summary>
 public class SShapeTaxi : MonoBehaviour
 {
     [HideInInspector] public float forwardSpeed;
@@ -317,10 +288,10 @@ public class SShapeTaxi : MonoBehaviour
     {
         timeElapsed += Time.deltaTime;
         
-        // Move forward (in Z direction)
+        // Move forward 
         float forwardMovement = forwardSpeed * Time.deltaTime;
         
-        // Sideways wave (in X direction)
+        // Sideways wave 
         float sidewaysOffset = Mathf.Sin(timeElapsed * waveFrequency) * waveAmplitude;
         float previousSidewaysOffset = Mathf.Sin((timeElapsed - Time.deltaTime) * waveFrequency) * waveAmplitude;
         float sidewaysMovement = sidewaysOffset - previousSidewaysOffset;
@@ -337,9 +308,6 @@ public class SShapeTaxi : MonoBehaviour
     }
 }
 
-/// <summary>
-/// Taxi drives backwards (faces one direction, moves the opposite)
-/// </summary>
 public class BackwardsDrivingTaxi : MonoBehaviour
 {
     [HideInInspector] public Vector3 moveDirection;
@@ -348,10 +316,8 @@ public class BackwardsDrivingTaxi : MonoBehaviour
     
     void Update()
     {
-        // Move in one direction
         transform.position += moveDirection * speed * Time.deltaTime;
         
-        // Face the opposite direction
         if (faceDirection != Vector3.zero)
         {
             transform.rotation = Quaternion.LookRotation(faceDirection);

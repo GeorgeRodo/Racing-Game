@@ -2,31 +2,27 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 
-/// <summary>
-/// Animates main menu UI elements with smooth entrance and exit animations
-/// Each panel has enter and exit animations for smooth transitions
-/// </summary>
 public class MainMenuAnimations : MonoBehaviour
 {
     [Header("Title Animation")]
     public RectTransform titleText;
-    public float titleSlideDistance = 300f;      // How far from left
-    public float titleOvershoot = 50f;           // How much it overshoots
-    public float titleDuration = 0.8f;           // Animation time
-    public float titleDelay = 0.2f;              // Delay before starting
+    public float titleSlideDistance = 300f;     
+    public float titleOvershoot = 50f;          
+    public float titleDuration = 0.8f;          
+    public float titleDelay = 0.2f;             
     
     [Header("Button Animations")]
     public RectTransform playButton;
     public RectTransform creditsButton;
     public RectTransform exitButton;
-    public float buttonSlideDistance = 100f;     // Slide up from below
-    public float buttonDuration = 0.6f;          // Animation time per button
-    public float buttonStagger = 0.15f;          // Delay between each button
-    public float buttonStartDelay = 0.5f;        // Delay before first button
+    public float buttonSlideDistance = 100f;     
+    public float buttonDuration = 0.6f;          
+    public float buttonStagger = 0.15f;          
+    public float buttonStartDelay = 0.5f;        
     
     [Header("Exit Animation Settings")]
-    public float exitDuration = 0.4f;            // How long exit animations take
-    public float exitStagger = 0.08f;            // Delay between elements exiting
+    public float exitDuration = 0.4f;            
+    public float exitStagger = 0.08f;            
     
     [Header("Track Panel - Back Button")]
     public RectTransform trackBackButton;
@@ -40,11 +36,11 @@ public class MainMenuAnimations : MonoBehaviour
     public float trackTitleDropDistance = 150f;
     public float trackTitleDuration = 0.5f;
     public float trackTitleDelay = 0.2f;
-    public float trackTitleWiggleAmount = 3f;    // Rotation wiggle in degrees
-    public float trackTitleWiggleSpeed = 2f;     // Wiggle frequency
+    public float trackTitleWiggleAmount = 3f;    
+    public float trackTitleWiggleSpeed = 2f;     
     
     [Header("Track Panel - Grid Buttons")]
-    public RectTransform trackGridContainer;     // The parent container with all 4 buttons
+    public RectTransform trackGridContainer;     
     public float trackGridSlideDistance = 150f;
     public float trackGridDuration = 0.4f;
     public float trackGridStartDelay = 0.3f;
@@ -61,15 +57,15 @@ public class MainMenuAnimations : MonoBehaviour
     public float creditsTitleDropDistance = 150f;
     public float creditsTitleDuration = 0.5f;
     public float creditsTitleDelay = 0.2f;
-    public float creditsTitlePulseAmount = 1.1f;   // Scale pulse (1.1 = 10% bigger)
-    public float creditsTitlePulseSpeed = 1.5f;    // Pulse frequency
+    public float creditsTitlePulseAmount = 1.1f;   
+    public float creditsTitlePulseSpeed = 1.5f;    
     
     [Header("Credits Panel - Name Cards")]
-    public RectTransform creditsName1;           // First developer name card
-    public RectTransform creditsName2;           // Second developer name card
+    public RectTransform creditsName1;           
+    public RectTransform creditsName2;          
     public float creditsNameSlideDistance = 200f;
     public float creditsNameDuration = 0.5f;
-    public float creditsNameStagger = 0.2f;      // Delay between each name
+    public float creditsNameStagger = 0.2f;      
     public float creditsNameStartDelay = 0.4f;
     
     [Header("Animation Curves")]
@@ -82,51 +78,42 @@ public class MainMenuAnimations : MonoBehaviour
     public CanvasGroup trackSelectionCanvasGroup;
     public CanvasGroup creditsCanvasGroup;
     
-    // Store original positions - Main Menu
     private Vector2 titleOriginalPos;
     private Vector2 playOriginalPos;
     private Vector2 creditsOriginalPos;
     private Vector2 exitOriginalPos;
     
-    // Track panel original positions
     private Vector2 trackBackOriginalPos;
     private Vector2 trackTitleOriginalPos;
     private Vector2 trackGridOriginalPos;
     
-    // Credits panel original positions
     private Vector2 creditsBackOriginalPos;
     private Vector2 creditsTitleOriginalPos;
     private Vector2 creditsName1OriginalPos;
     private Vector2 creditsName2OriginalPos;
     
-    // Animation state
     private bool isTitleWiggling = false;
     private bool isCreditsTitlePulsing = false;
     
-    // Panel tracking
     private enum ActivePanel { MainMenu, TrackSelection, Credits }
     private ActivePanel currentPanel = ActivePanel.MainMenu;
     
     void Awake()
     {
-        // Store original positions FIRST - Main Menu
         if (titleText != null) titleOriginalPos = titleText.anchoredPosition;
         if (playButton != null) playOriginalPos = playButton.anchoredPosition;
         if (creditsButton != null) creditsOriginalPos = creditsButton.anchoredPosition;
         if (exitButton != null) exitOriginalPos = exitButton.anchoredPosition;
         
-        // Store original positions - Track Panel
         if (trackBackButton != null) trackBackOriginalPos = trackBackButton.anchoredPosition;
         if (trackPanelTitle != null) trackTitleOriginalPos = trackPanelTitle.anchoredPosition;
         if (trackGridContainer != null) trackGridOriginalPos = trackGridContainer.anchoredPosition;
         
-        // Store original positions - Credits Panel
         if (creditsBackButton != null) creditsBackOriginalPos = creditsBackButton.anchoredPosition;
         if (creditsPanelTitle != null) creditsTitleOriginalPos = creditsPanelTitle.anchoredPosition;
         if (creditsName1 != null) creditsName1OriginalPos = creditsName1.anchoredPosition;
         if (creditsName2 != null) creditsName2OriginalPos = creditsName2.anchoredPosition;
         
-        // IMMEDIATELY hide elements off-screen (before first frame renders!)
         HideUIElements();
     }
     

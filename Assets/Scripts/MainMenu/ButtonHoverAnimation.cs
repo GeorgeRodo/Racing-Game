@@ -2,19 +2,15 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
-/// <summary>
-/// Add this to each button for hover/click animations
-/// Makes buttons scale up on hover and bounce on click
-/// </summary>
 public class ButtonHoverAnimation : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
 {
     [Header("Hover Settings")]
-    public float hoverScale = 1.1f;           // Scale when hovering
-    public float hoverDuration = 0.2f;        // How fast to scale
+    public float hoverScale = 1.1f;           
+    public float hoverDuration = 0.2f;        
     
     [Header("Click Settings")]
-    public float clickScale = 0.95f;          // Scale when clicking
-    public float clickDuration = 0.1f;        // How fast to click
+    public float clickScale = 0.95f;         
+    public float clickDuration = 0.1f;      
     
     [Header("Optional Audio")]
     public AudioSource audioSource;
@@ -35,7 +31,6 @@ public class ButtonHoverAnimation : MonoBehaviour, IPointerEnterHandler, IPointe
     
     void Update()
     {
-        // Smooth scale transition
         transform.localScale = Vector3.Lerp(
             transform.localScale, 
             targetScale, 
@@ -52,7 +47,6 @@ public class ButtonHoverAnimation : MonoBehaviour, IPointerEnterHandler, IPointe
             targetScale = originalScale * hoverScale;
         }
         
-        // Play hover sound
         if (audioSource != null && hoverSound != null)
         {
             audioSource.PlayOneShot(hoverSound);
@@ -74,7 +68,6 @@ public class ButtonHoverAnimation : MonoBehaviour, IPointerEnterHandler, IPointe
         isClicking = true;
         targetScale = originalScale * clickScale;
         
-        // Play click sound
         if (audioSource != null && clickSound != null)
         {
             audioSource.PlayOneShot(clickSound);
